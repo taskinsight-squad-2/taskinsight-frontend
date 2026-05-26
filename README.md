@@ -1,3 +1,11 @@
+## Organização
+
+Mantenha a pasta app limpa: Deixe dentro de src/app/ apenas os arquivos que realmente definem rotas (page.tsx) ou layouts (layout.tsx). Componentes menores de interface devem ir para a pasta src/components/.
+
+Use Aliases de Importação (Caminhos Absolutos): O Next.js já vem configurado para aceitar o caractere @ mapeando a pasta raiz do seu código. Em vez de fazer imports confusos como ../../components/Header, você pode simplesmente usar @/components/Header de qualquer lugar do projeto.
+
+Componentes de Servidor por Padrão: Lembre-se que no App Router todos os componentes dentro de app são, por padrão, Server Components (renderizados no servidor). Se você precisar usar estados do React (useState, useEffect) em alguma página ou componente, adicione a linha "use client"; no primeiríssimo topo desse arquivo.
+
 ## Getting Started
 
 First, run the development server:
