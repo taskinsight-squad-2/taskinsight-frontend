@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { translations, type Locale } from '@/lib/i18n'
 
@@ -17,20 +17,13 @@ interface Task {
   status: Status
 }
 
-const initialTasks: Task[] = [
-  { id: 1, title: 'Design new landing page', priority: 'High', category: 'Work', date: 'Jun 20', status: 'Pending' },
-  { id: 2, title: 'Fix authentication bug', priority: 'High', category: 'Dev', date: 'Jun 21', status: 'Pending' },
-  { id: 3, title: 'Weekly team meeting', priority: 'Medium', category: 'Meetings', date: 'Jun 22', status: 'Done' },
-  { id: 4, title: 'Update project documentation', priority: 'Low', category: 'Work', date: 'Jun 23', status: 'Pending' },
-  { id: 5, title: 'Code review - PR #42', priority: 'Medium', category: 'Dev', date: 'Jun 24', status: 'Done' },
-  { id: 6, title: 'Plan personal goals Q3', priority: 'Low', category: 'Personal', date: 'Jun 25', status: 'Pending' },
-]
-
-const categories = [
-  { label: 'Work', count: 2 },
-  { label: 'Dev', count: 2 },
-  { label: 'Meetings', count: 1 },
-  { label: 'Personal', count: 1 },
+const tasksMeta: { priority: Priority; date: string; status: Status }[] = [
+  { priority: 'High', date: 'Jun 20', status: 'Pending' },
+  { priority: 'High', date: 'Jun 21', status: 'Pending' },
+  { priority: 'Medium', date: 'Jun 22', status: 'Done' },
+  { priority: 'Low', date: 'Jun 23', status: 'Pending' },
+  { priority: 'Medium', date: 'Jun 24', status: 'Done' },
+  { priority: 'Low', date: 'Jun 25', status: 'Pending' },
 ]
 
 const priorityStyle: Record<Priority, string> = {
@@ -51,9 +44,33 @@ export default function DashboardPage() {
   const [locale, setLocale] = useState<Locale>('pt')
   const t = translations[locale]
   const [darkMode, setDarkMode] = useState(false)
-  const [tasks, setTasks] = useState<Task[]>(isNew ? [] : initialTasks)
   const [filter, setFilter] = useState<FilterTab>('All')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  const initialTasks = useMemo(() => tasksMeta.map((meta, i) => ({
+    id: i + 1,
+    title: t.tasks[i].title,
+    category: t.tasks[i].category,
+    ...meta,
+  })), [t])
+
+  const [taskStatuses, setTaskStatuses] = useState<Record<number, Status>>(
+    isNew ? {} : Object.fromEntries(tasksMeta.map((m, i) => [i + 1, m.status]))
+  )
+
+  const tasks = useMemo(() => isNew ? [] : tasksMeta.map((meta, i) => ({
+    id: i + 1,
+    title: t.tasks[i].title,
+    category: t.tasks[i].category,
+    priority: meta.priority,
+    date: meta.date,
+    status: (taskStatuses[i + 1] ?? meta.status) as Status,
+  })), [t, taskStatuses, isNew])
+
+  const categories = useMemo(() => Object.entries(t.categoryLabels).map(([, label], i) => ({
+    label,
+    count: [2, 2, 1, 1][i],
+  })), [t])
 
   const total = tasks.length
   const pending = tasks.filter(t => t.status === 'Pending').length
@@ -63,15 +80,15 @@ export default function DashboardPage() {
   const filtered = filter === 'All' ? tasks : tasks.filter(t => t.status === filter)
 
   function toggleTask(id: number) {
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, status: t.status === 'Done' ? 'Pending' : 'Done' } : t))
+    setTaskStatuses(prev => ({ ...prev, [id]: prev[id] === 'Done' ? 'Pending' : 'Done' }))
   }
 
   function completeAll() {
-    setTasks(prev => prev.map(t => ({ ...t, status: 'Done' })))
+    setTaskStatuses(prev => Object.fromEntries(Object.keys(prev).map(k => [k, 'Done'])))
   }
 
   function clearDone() {
-    setTasks(prev => prev.filter(t => t.status !== 'Done'))
+    setTaskStatuses(prev => Object.fromEntries(Object.entries(prev).filter(([, v]) => v !== 'Done')))
   }
 
   const navItems = [

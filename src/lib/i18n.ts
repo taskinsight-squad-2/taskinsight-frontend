@@ -48,6 +48,15 @@ export const translations = {
     priorityHigh: 'Alta',
     priorityMedium: 'Média',
     priorityLow: 'Baixa',
+    tasks: [
+      { title: 'Criar nova landing page', category: 'Trabalho' },
+      { title: 'Corrigir bug de autenticação', category: 'Dev' },
+      { title: 'Reunião semanal do time', category: 'Reuniões' },
+      { title: 'Atualizar documentação do projeto', category: 'Trabalho' },
+      { title: 'Code review - PR #42', category: 'Dev' },
+      { title: 'Planejar metas pessoais Q3', category: 'Pessoal' },
+    ],
+    categoryLabels: { Work: 'Trabalho', Dev: 'Dev', Meetings: 'Reuniões', Personal: 'Pessoal' },
   },
   en: {
     tagline: 'Manage your work, beautifully.',
@@ -96,5 +105,14 @@ export const translations = {
     priorityHigh: 'High',
     priorityMedium: 'Medium',
     priorityLow: 'Low',
+    tasks: [
+      { title: 'Design new landing page', category: 'Work' },
+      { title: 'Fix authentication bug', category: 'Dev' },
+      { title: 'Weekly team meeting', category: 'Meetings' },
+      { title: 'Update project documentation', category: 'Work' },
+      { title: 'Code review - PR #42', category: 'Dev' },
+      { title: 'Plan personal goals Q3', category: 'Personal' },
+    ],
+    categoryLabels: { Work: 'Work', Dev: 'Dev', Meetings: 'Meetings', Personal: 'Personal' },
   },
 }
