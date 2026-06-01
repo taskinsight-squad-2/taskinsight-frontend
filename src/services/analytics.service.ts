@@ -1,5 +1,5 @@
 const BASE_URL = process.env.NEXT_PUBLIC_PYTHON_API_URL;
-
+//TODO Definir tipo de retorno da promise
 export const analyticsService = {
   getSummary: async () => {
     const response = await fetch(`${BASE_URL}/analytics/summary`);
