@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { translations, type Locale } from '@/lib/i18n'
 
@@ -44,6 +44,10 @@ export default function DashboardPage() {
   const [locale, setLocale] = useState<Locale>('pt')
   const t = translations[locale]
   const [darkMode, setDarkMode] = useState(false)
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', darkMode)
+  }, [darkMode])
   const [filter, setFilter] = useState<FilterTab>('All')
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -151,8 +155,7 @@ export default function DashboardPage() {
   )
 
   return (
-    <div className={darkMode ? 'dark' : ''}>
-      <div className="min-h-screen flex bg-[#F8FAFC] dark:bg-gray-950 transition-colors duration-300">
+    <div className="min-h-screen flex bg-[#F8FAFC] dark:bg-gray-950 transition-colors duration-300">
 
         <div className="hidden md:flex flex-col h-screen sticky top-0">
           {sidebar}
@@ -298,7 +301,6 @@ export default function DashboardPage() {
             </div>
           </div>
         </main>
-      </div>
     </div>
   )
 }
