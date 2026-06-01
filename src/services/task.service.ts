@@ -31,11 +31,7 @@ export const taskService = {
     return response.json();
   },
 
-<<<<<<< HEAD
-  remove: async (id: string) => {
-=======
   remove: async (id: string): Promise<void> => {
->>>>>>> 2cc8e53 (Types)
     const response = await fetch(`${BASE_URL}/tasks/${id}`, {
       method: "DELETE",
     });
