@@ -1,13 +1,50 @@
-const BASE_URL = process.env.NEXT_PUBLIC_PYTHON_API_URL;
+import {
+  MetricsByStatusResponse,
+  MetricsByPriorityResponse,
+  AverageTimeResponse,
+  ThroughputResponse,
+  BacklogResponse,
+  ResponseTimeResponse,
+} from "@/types/analytics";
 
-export const analyticsService = {
-  getSummary: async () => {
-    const response = await fetch(`${BASE_URL}/analytics/summary`);
-    return response.json();
-  },
+const BASE_URL = process.env.NEXT_PUBLIC_ANALYTICS_API_URL;
 
-  getByUser: async (userId: string) => {
-    const response = await fetch(`${BASE_URL}/analytics/user/${userId}`);
-    return response.json();
-  },
+if (!BASE_URL) {
+  throw new Error("NEXT_PUBLIC_ANALYTICS_API_URL não está definida");
+}
+
+async function fetchMetrics<T>(endpoint: string, token: string): Promise<T> {
+  const res = await fetch(`${BASE_URL}${endpoint}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    throw new Error(`Erro ao buscar ${endpoint}: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+export const analyticsApi = {
+  getByStatus: (token: string) =>
+    fetchMetrics<MetricsByStatusResponse>("/task/metrics/by-status", token),
+
+  getByPriority: (token: string) =>
+    fetchMetrics<MetricsByPriorityResponse>("/task/metrics/by-priority", token),
+
+  getAverageTime: (token: string) =>
+    fetchMetrics<AverageTimeResponse>("/task/metrics/average-time", token),
+
+  getThroughput: (token: string) =>
+    fetchMetrics<ThroughputResponse>("/task/metrics/throughput", token),
+
+  getBacklog: (token: string) =>
+    fetchMetrics<BacklogResponse>("/task/metrics/backlog", token),
+
+  getResponseTime: (token: string) =>
+    fetchMetrics<ResponseTimeResponse>("/task/metrics/response-time", token),
 };
