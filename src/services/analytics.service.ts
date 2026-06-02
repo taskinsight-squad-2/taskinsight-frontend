@@ -13,12 +13,17 @@ if (!BASE_URL) {
   throw new Error("NEXT_PUBLIC_ANALYTICS_API_URL não está definida");
 }
 
-async function fetchMetrics<T>(endpoint: string, token: string): Promise<T> {
+async function fetchMetrics<T>(endpoint: string, token?: string): Promise<T> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
   const res = await fetch(`${BASE_URL}${endpoint}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
+    headers,
     cache: "no-store",
   });
 
@@ -30,21 +35,21 @@ async function fetchMetrics<T>(endpoint: string, token: string): Promise<T> {
 }
 
 export const analyticsApi = {
-  getByStatus: (token: string) =>
+  getByStatus: (token?: string) =>
     fetchMetrics<MetricsByStatusResponse>("/task/metrics/by-status", token),
 
-  getByPriority: (token: string) =>
+  getByPriority: (token?: string) =>
     fetchMetrics<MetricsByPriorityResponse>("/task/metrics/by-priority", token),
 
-  getAverageTime: (token: string) =>
+  getAverageTime: (token?: string) =>
     fetchMetrics<AverageTimeResponse>("/task/metrics/average-time", token),
 
-  getThroughput: (token: string) =>
+  getThroughput: (token?: string) =>
     fetchMetrics<ThroughputResponse>("/task/metrics/throughput", token),
 
-  getBacklog: (token: string) =>
+  getBacklog: (token?: string) =>
     fetchMetrics<BacklogResponse>("/task/metrics/backlog", token),
 
-  getResponseTime: (token: string) =>
+  getResponseTime: (token?: string) =>
     fetchMetrics<ResponseTimeResponse>("/task/metrics/response-time", token),
 };

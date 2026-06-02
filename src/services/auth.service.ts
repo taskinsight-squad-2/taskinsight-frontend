@@ -3,23 +3,42 @@ import { AuthResponse } from "@/types/auth";
 
 const BASE_URL = process.env.NEXT_PUBLIC_NODE_API_URL;
 
-//TODO Qual o retorno do backend? Só o token, ou o usuário e o token?
 export const authService = {
   login: async (email: string, password: string): Promise<AuthResponse> => {
-    const response = await fetch(`${BASE_URL}/auth/login`, {
+    if (!BASE_URL)
+      throw new Error("NEXT_PUBLIC_NODE_API_URL não está definido");
+
+    const response = await fetch(`${BASE_URL}/api/users/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
-    return response.json();
+
+    const json = await response.json();
+    if (json?.success === false) {
+      throw new Error(json.message || json.error || "Erro de autenticação");
+    }
+    return json.data;
   },
-  //TODO Definir tipo de retorno da promise
-  register: async (email: string, password: string) => {
-    const response = await fetch(`${BASE_URL}/auth/register`, {
+
+  register: async (
+    name: string,
+    email: string,
+    password: string,
+  ): Promise<AuthResponse> => {
+    if (!BASE_URL)
+      throw new Error("NEXT_PUBLIC_NODE_API_URL não está definido");
+
+    const response = await fetch(`${BASE_URL}/api/users/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ name, email, password }),
     });
-    return response.json();
+
+    const json = await response.json();
+    if (json?.success === false) {
+      throw new Error(json.message || json.error || "Erro de cadastro");
+    }
+    return json.data;
   },
 };
