@@ -34,7 +34,7 @@ export interface AverageTimeResponse {
 }
 
 export interface ThroughputItem {
-  date: string;
+  day: string;
   count: number;
 }
 
