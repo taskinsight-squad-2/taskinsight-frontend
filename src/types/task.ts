@@ -2,7 +2,7 @@ export type TaskStatus = "PENDING" | "IN_PROGRESS" | "DONE" | "CANCELLED";
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH";
 
 export interface Task {
-  id: string;
+  _id: string;
   title: string;
   description: string;
   status: TaskStatus;
