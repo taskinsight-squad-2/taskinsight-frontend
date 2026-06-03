@@ -119,7 +119,7 @@ export default function DashboardTestePage() {
   }
 
   function handleEditTask(task: Task) {
-    setSelectedTaskId(task.id);
+    setSelectedTaskId(task._id);
     setTitle(task.title);
     setDescription(task.description);
     setStatus(task.status);
@@ -271,7 +271,7 @@ export default function DashboardTestePage() {
                 ) : (
                   tasks.map((task, index) => (
                     <div
-                      key={task.id ?? index}
+                      key={task._id ?? index}
                       className="rounded-3xl border border-slate-200 p-4 hover:border-violet-300 transition"
                     >
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -302,7 +302,7 @@ export default function DashboardTestePage() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDeleteTask(task.id)}
+                          onClick={() => handleDeleteTask(task._id)}
                           className="rounded-2xl border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 transition"
                         >
                           Deletar
