@@ -148,9 +148,10 @@ export default function LoginPage() {
             value={locale}
             onChange={e => setLocale(e.target.value as Locale)}
             className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border ${ctrlBg} outline-none cursor-pointer hover:opacity-80 transition`}
+            style={{ backgroundColor: dark ? '#0D1117' : undefined }}
           >
-            <option value="pt">PT-BR</option>
-            <option value="en">EN</option>
+            <option value="pt" style={{ backgroundColor: dark ? '#0D1117' : 'white' }}>PT-BR</option>
+            <option value="en" style={{ backgroundColor: dark ? '#0D1117' : 'white' }}>EN</option>
           </select>
           <button
             onClick={() => setDark(v => !v)}

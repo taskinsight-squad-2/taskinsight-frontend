@@ -2,15 +2,36 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import { Task } from "@/types/task";
 import { taskService } from "@/services/task.service";
 import { analyticsApi } from "@/services/analytics.service";
+import {
+  MetricsByStatusResponse,
+  MetricsByPriorityResponse,
+  AverageTimeResponse,
+  ThroughputResponse,
+  BacklogResponse,
+  ResponseTimeResponse,
+} from "@/types/analytics";
 
 interface AnalyticsResult {
-  totalTasks: number;
-  completedTasks: number;
-  pendingTasks: number;
-  averageCompletionRate: number;
+  status: MetricsByStatusResponse | null;
+  priority: MetricsByPriorityResponse | null;
+  averageTime: AverageTimeResponse | null;
+  throughput: ThroughputResponse | null;
+  backlog: BacklogResponse | null;
+  responseTime: ResponseTimeResponse | null;
 }
 
 export default function DashboardTestePage() {
@@ -46,11 +67,33 @@ export default function DashboardTestePage() {
   async function loadAnalytics() {
     try {
       const status = await analyticsApi.getByStatus(token ?? undefined);
+
+      // Só chama getBacklog se houver tarefas DONE
+      let backlog = null;
+      if (status.data.DONE.count > 0) {
+        try {
+          backlog = await analyticsApi.getBacklog(token ?? undefined);
+        } catch (error) {
+          console.warn("Erro ao buscar backlog:", error);
+          backlog = null;
+        }
+      }
+
+      const [priority, averageTime, throughput, responseTime] =
+        await Promise.all([
+          analyticsApi.getByPriority(token ?? undefined),
+          analyticsApi.getAverageTime(token ?? undefined),
+          analyticsApi.getThroughput(token ?? undefined),
+          analyticsApi.getResponseTime(token ?? undefined),
+        ]);
+
       setAnalytics({
-        totalTasks: status.data.total_tasks,
-        completedTasks: status.data.DONE.count,
-        pendingTasks: status.data.PENDING.count,
-        averageCompletionRate: status.data.DONE.percent,
+        status,
+        priority,
+        averageTime,
+        throughput,
+        backlog,
+        responseTime,
       });
       setAnalyticsError(null);
     } catch (error) {
@@ -315,7 +358,7 @@ export default function DashboardTestePage() {
             </div>
 
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="mb-4">
+              <div className="mb-6">
                 <h2 className="text-xl font-semibold text-slate-900">
                   Analytics
                 </h2>
@@ -323,40 +366,318 @@ export default function DashboardTestePage() {
                   Resumo de métricas geradas pela FastAPI.
                 </p>
               </div>
-              {analytics ? (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-3xl bg-slate-50 p-4">
-                    <p className="text-sm font-medium text-slate-500">
-                      Total de tasks
-                    </p>
-                    <p className="mt-2 text-3xl font-bold text-slate-900">
-                      {analytics.totalTasks}
-                    </p>
+              {analytics?.status ? (
+                <div className="space-y-8">
+                  {/* Status Metrics */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-700 mb-4">
+                      Métricas por Status
+                    </h3>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                      <div className="rounded-3xl bg-slate-50 p-4">
+                        <p className="text-sm font-medium text-slate-500">
+                          Total de tasks
+                        </p>
+                        <p className="mt-2 text-3xl font-bold text-slate-900">
+                          {analytics.status.data.total_tasks}
+                        </p>
+                      </div>
+                      <div className="rounded-3xl bg-slate-50 p-4">
+                        <p className="text-sm font-medium text-slate-500">
+                          PENDING
+                        </p>
+                        <p className="mt-2 text-2xl font-bold text-amber-600">
+                          {analytics.status.data.PENDING.count}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {analytics.status.data.PENDING.percent}%
+                        </p>
+                      </div>
+                      <div className="rounded-3xl bg-slate-50 p-4">
+                        <p className="text-sm font-medium text-slate-500">
+                          IN_PROGRESS
+                        </p>
+                        <p className="mt-2 text-2xl font-bold text-blue-600">
+                          {analytics.status.data.IN_PROGRESS.count}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {analytics.status.data.IN_PROGRESS.percent}%
+                        </p>
+                      </div>
+                      <div className="rounded-3xl bg-slate-50 p-4">
+                        <p className="text-sm font-medium text-slate-500">
+                          DONE
+                        </p>
+                        <p className="mt-2 text-2xl font-bold text-green-600">
+                          {analytics.status.data.DONE.count}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {analytics.status.data.DONE.percent}%
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="rounded-3xl bg-slate-50 p-4">
-                    <p className="text-sm font-medium text-slate-500">
-                      Concluídas
-                    </p>
-                    <p className="mt-2 text-3xl font-bold text-slate-900">
-                      {analytics.completedTasks}
-                    </p>
-                  </div>
-                  <div className="rounded-3xl bg-slate-50 p-4">
-                    <p className="text-sm font-medium text-slate-500">
-                      Pendentes
-                    </p>
-                    <p className="mt-2 text-3xl font-bold text-slate-900">
-                      {analytics.pendingTasks}
-                    </p>
-                  </div>
-                  <div className="rounded-3xl bg-slate-50 p-4">
-                    <p className="text-sm font-medium text-slate-500">
-                      Taxa média
-                    </p>
-                    <p className="mt-2 text-3xl font-bold text-slate-900">
-                      {analytics.averageCompletionRate}%
-                    </p>
-                  </div>
+
+                  {/* Priority Metrics */}
+                  {analytics.priority && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-700 mb-4">
+                        Métricas por Prioridade
+                      </h3>
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        <div className="rounded-3xl bg-slate-50 p-4">
+                          <p className="text-sm font-medium text-slate-500">
+                            HIGH
+                          </p>
+                          <p className="mt-2 text-3xl font-bold text-red-600">
+                            {analytics.priority.data.HIGH.count}
+                          </p>
+                          <p className="text-xs text-slate-500 mt-1">
+                            {analytics.priority.data.HIGH.percent}%
+                          </p>
+                        </div>
+                        <div className="rounded-3xl bg-slate-50 p-4">
+                          <p className="text-sm font-medium text-slate-500">
+                            MEDIUM
+                          </p>
+                          <p className="mt-2 text-3xl font-bold text-amber-600">
+                            {analytics.priority.data.MEDIUM.count}
+                          </p>
+                          <p className="text-xs text-slate-500 mt-1">
+                            {analytics.priority.data.MEDIUM.percent}%
+                          </p>
+                        </div>
+                        <div className="rounded-3xl bg-slate-50 p-4">
+                          <p className="text-sm font-medium text-slate-500">
+                            LOW
+                          </p>
+                          <p className="mt-2 text-3xl font-bold text-green-600">
+                            {analytics.priority.data.LOW.count}
+                          </p>
+                          <p className="text-xs text-slate-500 mt-1">
+                            {analytics.priority.data.LOW.percent}%
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Average Time Metric */}
+                  {analytics.averageTime && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-700 mb-4">
+                        Tempo Médio de Conclusão
+                      </h3>
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        <div className="rounded-3xl bg-slate-50 p-4">
+                          <p className="text-sm font-medium text-slate-500">
+                            Horas
+                          </p>
+                          <p className="mt-2 text-3xl font-bold text-slate-900">
+                            {analytics.averageTime.data.average_time_hours.toFixed(
+                              2,
+                            )}
+                          </p>
+                        </div>
+                        <div className="rounded-3xl bg-slate-50 p-4">
+                          <p className="text-sm font-medium text-slate-500">
+                            Dias
+                          </p>
+                          <p className="mt-2 text-3xl font-bold text-slate-900">
+                            {analytics.averageTime.data.average_time_days.toFixed(
+                              2,
+                            )}
+                          </p>
+                        </div>
+                        <div className="rounded-3xl bg-slate-50 p-4">
+                          <p className="text-sm font-medium text-slate-500">
+                            Segundos
+                          </p>
+                          <p className="mt-2 text-3xl font-bold text-slate-900">
+                            {analytics.averageTime.data.average_time_seconds.toFixed(
+                              0,
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Throughput Chart */}
+                  {analytics.throughput &&
+                    analytics.throughput.data.length > 0 && (
+                      <div>
+                        <h3 className="text-sm font-semibold text-slate-700 mb-4">
+                          Throughput (Tasks por Dia)
+                        </h3>
+                        <div className="rounded-3xl bg-slate-50 p-4">
+                          <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={analytics.throughput.data}>
+                              <CartesianGrid stroke="#e2e8f0" />
+                              <XAxis
+                                dataKey="day"
+                                stroke="#64748b"
+                                style={{ fontSize: "0.875rem" }}
+                              />
+                              <YAxis
+                                stroke="#64748b"
+                                style={{ fontSize: "0.875rem" }}
+                              />
+                              <Tooltip
+                                contentStyle={{
+                                  backgroundColor: "#fff",
+                                  border: "1px solid #e2e8f0",
+                                  borderRadius: "8px",
+                                }}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="count"
+                                stroke="#7c3aed"
+                                strokeWidth={2}
+                                dot={{ fill: "#7c3aed", r: 4 }}
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    )}
+                  {(!analytics.throughput ||
+                    analytics.throughput.data.length === 0) && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-700 mb-4">
+                        Throughput (Tasks por Dia)
+                      </h3>
+                      <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-6 text-slate-500">
+                        Dados Insuficientes para analytics
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Backlog Chart */}
+                  {analytics.backlog && analytics.backlog.data.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-700 mb-4">
+                        Evolução do Backlog
+                      </h3>
+                      <div className="rounded-3xl bg-slate-50 p-4">
+                        <ResponsiveContainer width="100%" height={300}>
+                          <BarChart data={analytics.backlog.data}>
+                            <CartesianGrid stroke="#e2e8f0" />
+                            <XAxis
+                              dataKey="date"
+                              stroke="#64748b"
+                              style={{ fontSize: "0.875rem" }}
+                            />
+                            <YAxis
+                              stroke="#64748b"
+                              style={{ fontSize: "0.875rem" }}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: "#fff",
+                                border: "1px solid #e2e8f0",
+                                borderRadius: "8px",
+                              }}
+                            />
+                            <Bar
+                              dataKey="criadas"
+                              fill="#3b82f6"
+                              name="Criadas"
+                            />
+                            <Bar
+                              dataKey="finalizadas"
+                              fill="#10b981"
+                              name="Finalizadas"
+                            />
+                            <Bar
+                              dataKey="backlog"
+                              fill="#ef4444"
+                              name="Backlog"
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  )}
+                  {(!analytics.backlog ||
+                    analytics.backlog.data.length === 0) && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-700 mb-4">
+                        Evolução do Backlog
+                      </h3>
+                      <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-6 text-slate-500">
+                        Dados Insuficientes para analytics
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Response Time Chart */}
+                  {analytics.responseTime &&
+                    analytics.responseTime.data.length > 0 && (
+                      <div>
+                        <h3 className="text-sm font-semibold text-slate-700 mb-4">
+                          SLA de Tempo de Resposta
+                        </h3>
+                        <div className="rounded-3xl bg-slate-50 p-4">
+                          <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={analytics.responseTime.data}>
+                              <CartesianGrid stroke="#e2e8f0" />
+                              <XAxis
+                                dataKey="date"
+                                stroke="#64748b"
+                                style={{ fontSize: "0.875rem" }}
+                              />
+                              <YAxis
+                                stroke="#64748b"
+                                style={{ fontSize: "0.875rem" }}
+                                label={{
+                                  value: "%",
+                                  angle: -90,
+                                  position: "insideLeft",
+                                }}
+                              />
+                              <Tooltip
+                                contentStyle={{
+                                  backgroundColor: "#fff",
+                                  border: "1px solid #e2e8f0",
+                                  borderRadius: "8px",
+                                }}
+                                formatter={(value) => `${value}%`}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="slaPercentage"
+                                stroke="#f59e0b"
+                                strokeWidth={2}
+                                dot={{ fill: "#f59e0b", r: 4 }}
+                                name="SLA %"
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="target"
+                                stroke="#6b7280"
+                                strokeWidth={2}
+                                strokeDasharray="5 5"
+                                dot={{ fill: "#6b7280", r: 4 }}
+                                name="Target"
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    )}
+                  {(!analytics.responseTime ||
+                    analytics.responseTime.data.length === 0) && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-700 mb-4">
+                        SLA de Tempo de Resposta
+                      </h3>
+                      <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-6 text-slate-500">
+                        Dados Insuficientes para analytics
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-6 text-slate-500">

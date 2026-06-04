@@ -2,14 +2,26 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { translations, type Locale } from '@/lib/i18n'
 import { taskService } from '@/services/task.service'
+import { analyticsApi } from '@/services/analytics.service'
 import type { Task as ApiTask } from '@/types/task'
+import type { MetricsByStatusResponse, MetricsByPriorityResponse, AverageTimeResponse, ThroughputResponse, BacklogResponse, ResponseTimeResponse } from '@/types/analytics'
 
 type Priority = 'High' | 'Medium' | 'Low'
 type Status   = 'Pending' | 'InProgress' | 'Done'
-type FilterTab = 'All' | 'Pending' | 'InProgress' | 'Done'
+type FilterTab = 'All' | 'Pending' | 'InProgress' | 'Done' | 'Overdue'
 type SortMode  = 'default' | 'created' | 'completed' | 'overdue'
+
+interface AnalyticsResult {
+  status: MetricsByStatusResponse | null
+  priority: MetricsByPriorityResponse | null
+  averageTime: AverageTimeResponse | null
+  throughput: ThroughputResponse | null
+  backlog: BacklogResponse | null
+  responseTime: ResponseTimeResponse | null
+}
 
 interface TaskDates {
   created:   string
@@ -60,8 +72,23 @@ export default function DashboardPage() {
   const [apiTasks, setApiTasks] = useState<ApiTask[]>([])
   const [loadingTasks, setLoadingTasks] = useState(true)
 
+  useEffect(() => {
+    const stored = localStorage.getItem('token')
+    if (!stored) { router.replace('/login'); return }
+  }, [router])
+
+  useEffect(() => {
+    function clearSession() {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+    }
+    window.addEventListener('beforeunload', clearSession)
+    return () => window.removeEventListener('beforeunload', clearSession)
+  }, [])
+
   const fetchTasks = useCallback(async () => {
     const token = localStorage.getItem('token') ?? undefined
+    if (!token) return
     try {
       const data = await taskService.getAll(token)
       setApiTasks(Array.isArray(data) ? data : [])
@@ -73,6 +100,32 @@ export default function DashboardPage() {
   }, [])
 
   useEffect(() => { fetchTasks() }, [fetchTasks])
+
+  // ── analytics ─────────────────────────────────────────────────────
+  const [analytics, setAnalytics] = useState<AnalyticsResult | null>(null)
+
+  const loadAnalytics = useCallback(async () => {
+    const tok = localStorage.getItem('token') ?? undefined
+    if (!tok) return
+    try {
+      const status = await analyticsApi.getByStatus(tok)
+      let backlog = null
+      if (status.data.DONE.count > 0) {
+        backlog = await analyticsApi.getBacklog(tok).catch(() => null)
+      }
+      const [priority, averageTime, throughput, responseTime] = await Promise.all([
+        analyticsApi.getByPriority(tok),
+        analyticsApi.getAverageTime(tok),
+        analyticsApi.getThroughput(tok),
+        analyticsApi.getResponseTime(tok),
+      ])
+      setAnalytics({ status, priority, averageTime, throughput, backlog, responseTime })
+    } catch {
+      setAnalytics(null)
+    }
+  }, [])
+
+  useEffect(() => { loadAnalytics() }, [loadAnalytics])
 
   // ── task state ───────────────────────────────────────────────────
   const [taskStatuses,  setTaskStatuses]  = useState<Record<string, Status>>({})
@@ -233,10 +286,13 @@ export default function DashboardPage() {
     priority: mapPriority(apiTask.priority),
     status: (taskStatuses[apiTask._id] ?? mapStatus(apiTask.status)) as Status,
   })), [apiTasks, taskStatuses])
+  const [priorityFilter, setPriorityFilter] = useState<Priority | 'All'>('All')
+  function setPriorityFilterReset(p: Priority | 'All') { setPriorityFilter(p); setPage(1) }
+
   const categories = useMemo(() => [
-    { label: t.priorityHigh,   count: tasks.filter(t => t.priority === 'High').length },
-    { label: t.priorityMedium, count: tasks.filter(t => t.priority === 'Medium').length },
-    { label: t.priorityLow,    count: tasks.filter(t => t.priority === 'Low').length },
+    { label: t.priorityHigh,   count: tasks.filter(t => t.priority === 'High').length,   priority: 'High'   as Priority, dot: 'bg-red-400'     },
+    { label: t.priorityMedium, count: tasks.filter(t => t.priority === 'Medium').length, priority: 'Medium' as Priority, dot: 'bg-amber-400'   },
+    { label: t.priorityLow,    count: tasks.filter(t => t.priority === 'Low').length,    priority: 'Low'    as Priority, dot: 'bg-emerald-400' },
   ], [tasks, t])
 
   const total      = tasks.length
@@ -251,12 +307,12 @@ export default function DashboardPage() {
   ).length, [tasks, taskDates])
 
   const filtered = useMemo(() => {
-    let list = filter === 'All' ? tasks : tasks.filter(t => t.status === filter)
-    if (sortMode === 'created')   list = [...list].sort((a, b) => (taskDates[a.id]?.created ?? '').localeCompare(taskDates[b.id]?.created ?? ''))
-    if (sortMode === 'completed') list = [...list].filter(t => taskDates[t.id]?.finished).sort((a, b) => (taskDates[b.id]?.finished ?? '').localeCompare(taskDates[a.id]?.finished ?? ''))
-    if (sortMode === 'overdue')   list = [...list].filter(t => (t.status === 'Pending' || t.status === 'InProgress') && taskDates[t.id]?.deadline && taskDates[t.id].deadline! < today())
+    let list = filter === 'Overdue'
+      ? tasks.filter(t => (t.status === 'Pending' || t.status === 'InProgress') && taskDates[t.id]?.deadline && taskDates[t.id].deadline! < today())
+      : filter === 'All' ? tasks : tasks.filter(t => t.status === filter)
+    if (priorityFilter !== 'All') list = list.filter(t => t.priority === priorityFilter)
     return list
-  }, [filter, tasks, sortMode, taskDates])
+  }, [filter, tasks, taskDates, priorityFilter])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const safePage   = Math.min(page, totalPages)
@@ -333,40 +389,83 @@ export default function DashboardPage() {
     Done:       { color: 'bg-emerald-50 text-emerald-600 border border-emerald-200', label: 'Concluída' },
   }
 
-  const navItems: { label: string; icon: React.ReactNode; sort: SortMode; badge?: number }[] = [
+  const navItems: { label: string; icon: React.ReactNode; sort: SortMode }[] = [
     { label: t.dashboard, sort: 'default', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg> },
-    { label: 'Por Criação', sort: 'created', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> },
-    { label: 'Por Conclusão', sort: 'completed', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> },
-    { label: 'Em Atraso', sort: 'overdue', badge: nOverdue, icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> },
   ]
 
-  const filterTabs: { key: FilterTab; label: string }[] = [
-    { key: 'All', label: t.all },
-    { key: 'Pending', label: 'Pendente' },
+  const filterTabs: { key: FilterTab; label: string; badge?: number }[] = [
+    { key: 'All',        label: t.all },
+    { key: 'Pending',    label: 'Pendente' },
     { key: 'InProgress', label: 'Em andamento' },
-    { key: 'Done', label: t.statusDone },
+    { key: 'Done',       label: t.statusDone },
+    { key: 'Overdue',    label: 'Em atraso', badge: nOverdue },
   ]
+
+  // ── semanas do gráfico ─────────────────────────────────────────
+  const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+
+  const [chartMonth, setChartMonth] = useState<{ year: number; month: number }>(() => {
+    const n = new Date(); return { year: n.getFullYear(), month: n.getMonth() }
+  })
+  const [chartWeek, setChartWeek] = useState<number>(() => Math.ceil(new Date().getDate() / 7))
+
+  function getWeekDates(year: number, month: number, week: number): string[] {
+    const lastDay = new Date(year, month + 1, 0).getDate()
+    const start = (week - 1) * 7 + 1
+    const end   = Math.min(week * 7, lastDay)
+    if (start > lastDay) return []
+    const dates: string[] = []
+    for (let d = start; d <= end; d++) {
+      const iso = new Date(year, month, d)
+      dates.push(`${iso.getFullYear()}-${String(iso.getMonth()+1).padStart(2,'0')}-${String(iso.getDate()).padStart(2,'0')}`)
+    }
+    return dates
+  }
+
+  function totalWeeks(year: number, month: number) {
+    return Math.ceil(new Date(year, month + 1, 0).getDate() / 7)
+  }
+
+  function prevWeek() {
+    if (chartWeek > 1) {
+      setChartWeek(w => w - 1)
+    } else {
+      const pm = chartMonth.month === 0
+        ? { year: chartMonth.year - 1, month: 11 }
+        : { year: chartMonth.year, month: chartMonth.month - 1 }
+      setChartMonth(pm)
+      setChartWeek(totalWeeks(pm.year, pm.month))
+    }
+  }
+
+  function nextWeek() {
+    if (chartWeek < totalWeeks(chartMonth.year, chartMonth.month)) {
+      setChartWeek(w => w + 1)
+    } else {
+      const nm = chartMonth.month === 11
+        ? { year: chartMonth.year + 1, month: 0 }
+        : { year: chartMonth.year, month: chartMonth.month + 1 }
+      setChartMonth(nm)
+      setChartWeek(1)
+    }
+  }
+
+  const availableYears = useMemo(() => {
+    const currentYear = new Date().getFullYear()
+    const taskYears = new Set(apiTasks.map(t => Number(t.createdAt?.slice(0, 4))).filter(y => y >= 2026))
+    for (let y = 2026; y <= currentYear + 1; y++) taskYears.add(y)
+    return [...taskYears].sort()
+  }, [apiTasks])
+
+  const weekLabel = `Semana ${chartWeek} — ${monthNames[chartMonth.month]} ${chartMonth.year}`
 
   // ── dados dos gráficos ─────────────────────────────────────────
   const chartData = useMemo(() => {
-    const allDates = apiTasks
-      .map(t => t.createdAt?.slice(0, 10))
-      .filter(Boolean) as string[]
-    if (allDates.length === 0) return null
-
-    const minDate = allDates.reduce((a, b) => a < b ? a : b)
-    const maxDate = today()
-    const totalDays = Math.max(1, daysBetween(minDate, maxDate) ?? 1)
-    // gera até 6 pontos uniformemente distribuídos
-    const nPoints = Math.min(6, totalDays + 1)
-    const points = Array.from({ length: nPoints }, (_, i) => {
-      const d = new Date(minDate)
-      d.setDate(d.getDate() + Math.round((totalDays / (nPoints - 1)) * i))
-      return d.toISOString().slice(0, 10)
-    })
-
-    const planned = points.map((_, i) => Math.round((total / (nPoints - 1)) * i))
-    const done = points.map(date => apiTasks.filter(t => {
+    const points = getWeekDates(chartMonth.year, chartMonth.month, chartWeek)
+    if (points.length === 0) return null
+    const n = points.length
+    const planned  = points.map((_, i) => Math.round((total / Math.max(1, n - 1)) * i))
+    const done     = points.map(date => apiTasks.filter(t => {
       const isDone   = taskStatuses[t._id] === 'Done'
       const finished = taskDates[t._id]?.finished ?? (isDone ? today() : null)
       return finished && finished <= date
@@ -377,18 +476,16 @@ export default function DashboardPage() {
       const finished = taskDates[t._id]?.finished
       return started && started <= date && (!finished || finished > date)
     }).length)
-
-    // labels: dia/mês
     const labels = points.map(d => { const [,m,day] = d.split('-'); return `${day}/${m}` })
     return { points, planned, done, progress, labels }
-  }, [apiTasks, taskDates, taskStatuses, total])
+  }, [apiTasks, taskDates, taskStatuses, total, chartMonth, chartWeek])
 
   const GW = 560; const GH = 220; const GP = 44
-  const nPoints  = chartData?.labels.length ?? 6
-  const plannedSeries  = chartData?.planned  ?? [0,0,0,0,0,0]
-  const doneSeries     = chartData?.done     ?? [0,0,0,0,0,0]
-  const progressSeries = chartData?.progress ?? [0,0,0,0,0,0]
-  const chartLabels    = chartData?.labels   ?? ['','','','','','']
+  const nPoints  = chartData?.labels.length ?? 7
+  const plannedSeries  = chartData?.planned  ?? Array(7).fill(0)
+  const doneSeries     = chartData?.done     ?? Array(7).fill(0)
+  const progressSeries = chartData?.progress ?? Array(7).fill(0)
+  const chartLabels    = chartData?.labels   ?? Array(7).fill('')
   const gMax = Math.max(...plannedSeries, ...doneSeries, ...progressSeries, total, 1)
   function gx(i: number) { return GP + i * ((GW - GP * 2) / Math.max(1, nPoints - 1)) }
   function gy(v: number) { return GH - GP - Math.round(((v - 1) / Math.max(1, gMax - 1)) * (GH - GP * 2)) }
@@ -459,13 +556,28 @@ export default function DashboardPage() {
 
         {!collapsed && (
           <>
-            <p className={`text-[10px] font-bold ${sectionLbl} uppercase tracking-[0.15em] px-3 mt-6 mb-2`}>{t.categories}</p>
-            {categories.map(cat => (
-              <div key={cat.label} className={`flex items-center justify-between px-3 py-2 rounded-xl text-sm ${catItem} transition cursor-pointer`}>
-                <span>{cat.label}</span>
-                <span className={`text-[11px] ${catBadge} border rounded-full px-2 py-0.5 font-mono`}>{cat.count}</span>
-              </div>
-            ))}
+            <div className="flex items-center justify-between px-3 mt-6 mb-2">
+              <p className={`text-[10px] font-bold ${sectionLbl} uppercase tracking-[0.15em]`}>{t.categories}</p>
+              {priorityFilter !== 'All' && (
+                <button onClick={() => setPriorityFilterReset('All')}
+                  className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${dark ? 'text-white/35 hover:text-white/60' : 'text-slate-400 hover:text-slate-600'} transition`}>
+                  limpar
+                </button>
+              )}
+            </div>
+            {categories.map(cat => {
+              const isActive = priorityFilter === cat.priority
+              return (
+                <button key={cat.label} onClick={() => setPriorityFilterReset(isActive ? 'All' : cat.priority)}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition ${isActive ? navAct : catItem}`}>
+                  <span className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${cat.dot}`} />
+                    {cat.label}
+                  </span>
+                  <span className={`text-[11px] border rounded-full px-2 py-0.5 font-mono ${isActive ? (dark ? 'bg-violet-500/20 border-violet-500/30 text-violet-300' : 'bg-violet-100 border-violet-200 text-violet-600') : `${catBadge}`}`}>{cat.count}</span>
+                </button>
+              )
+            })}
           </>
         )}
       </nav>
@@ -680,9 +792,10 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-2">
             <select value={locale} onChange={e => setLocale(e.target.value as Locale)}
+              style={{ backgroundColor: dark ? '#0D1117' : undefined }}
               className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border ${ctrlBg} outline-none cursor-pointer hover:opacity-80 transition`}>
-              <option value="pt">PT-BR</option>
-              <option value="en">EN</option>
+              <option style={{ backgroundColor: dark ? '#0D1117' : 'white' }} value="pt">PT-BR</option>
+              <option style={{ backgroundColor: dark ? '#0D1117' : 'white' }} value="en">EN</option>
             </select>
             <button onClick={() => setDark(v => !v)}
               className={`w-8 h-8 flex items-center justify-center rounded-lg border ${ctrlBg} hover:opacity-80 transition text-sm`}>
@@ -736,8 +849,11 @@ export default function DashboardPage() {
               <div className={`flex ${filterBg} border rounded-xl p-1 gap-1`}>
                 {filterTabs.map(f => (
                   <button key={f.key} onClick={() => setFilterReset(f.key)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${filter === f.key ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/30' : filterInact}`}>
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${filter === f.key ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/30' : filterInact}`}>
                     {f.label}
+                    {f.badge !== undefined && f.badge > 0 && (
+                      <span className={`text-[10px] font-bold rounded-full px-1.5 py-px leading-none ${filter === f.key ? 'bg-white/25 text-white' : 'bg-red-500 text-white'}`}>{f.badge}</span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -746,8 +862,9 @@ export default function DashboardPage() {
                 <div className="flex items-center gap-1.5">
                   <span className={`text-xs ${textFaint}`}>Mostrar</span>
                   <select value={pageSize} onChange={e => setPageSizeReset(Number(e.target.value))}
+                    style={{ backgroundColor: dark ? '#0D1117' : undefined }}
                     className={`text-xs font-semibold px-2 py-1 rounded-lg border ${ctrlBg} outline-none cursor-pointer`}>
-                    {[5, 10, 25].map(n => <option key={n} value={n}>{n}</option>)}
+                    {[5, 10, 25].map(n => <option key={n} value={n} style={{ backgroundColor: dark ? '#0D1117' : 'white' }}>{n}</option>)}
                   </select>
                   <span className={`text-xs ${textFaint}`}>por página</span>
                 </div>
@@ -884,6 +1001,7 @@ export default function DashboardPage() {
                               extra: (
                                 <button
                                   onClick={() => {
+                                    if (isDone) return
                                     if (dates?.deadline) {
                                       setConfirmDeadlineId(task.id)
                                       setDeadlineChangeStep('ask')
@@ -892,7 +1010,8 @@ export default function DashboardPage() {
                                       setDeadlineDraft(prev => ({ ...prev, [task.id]: '' }))
                                     }
                                   }}
-                                  className={`mt-1 flex items-center gap-1 text-[10px] font-medium ${dark ? 'text-violet-400/70 hover:text-violet-300' : 'text-violet-400 hover:text-violet-600'} transition`}>
+                                  disabled={isDone}
+                                  className={`mt-1 flex items-center gap-1 text-[10px] font-medium transition ${isDone ? `${dark ? 'text-white/20' : 'text-slate-300'} cursor-not-allowed` : `${dark ? 'text-violet-400/70 hover:text-violet-300' : 'text-violet-400 hover:text-violet-600'} cursor-pointer`}`}>
                                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                   {dates?.deadline ? 'Alterar' : 'Definir'}
                                 </button>
@@ -1048,26 +1167,63 @@ export default function DashboardPage() {
           {/* ── Gráfico de acompanhamento ── */}
           <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
             {/* cabeçalho */}
-            <div className={`px-5 pt-4 pb-3 flex items-center justify-between flex-wrap gap-3 border-b ${dark ? 'border-white/5' : 'border-slate-100'}`}>
-              <div>
-                <p className={`text-sm font-semibold ${text}`}>Progresso das Tarefas</p>
-                <p className={`text-xs ${textFaint} mt-0.5`}>Concluídas vs. previsto ao longo do tempo</p>
+            <div className={`px-5 pt-4 pb-3 border-b ${dark ? 'border-white/5' : 'border-slate-100'}`}>
+              {/* linha 1: título + legenda */}
+              <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
+                <div>
+                  <p className={`text-sm font-semibold ${text}`}>Progresso das Tarefas</p>
+                  <p className={`text-xs ${textFaint} mt-0.5`}>Concluídas vs. previsto ao longo do tempo</p>
+                </div>
+                <div className="flex items-center gap-5">
+                  {[
+                    { color: '#10b981', label: 'Concluídas', dash: false },
+                    { color: '#6366f1', label: 'Em andamento', dash: false },
+                    { color: dark ? 'rgba(255,255,255,.35)' : 'rgba(100,116,139,.55)', label: 'Previsto', dash: true },
+                  ].map(l => (
+                    <div key={l.label} className="flex items-center gap-1.5">
+                      <svg width="22" height="8" className="flex-shrink-0">
+                        {l.dash
+                          ? <line x1="0" y1="4" x2="22" y2="4" stroke={l.color} strokeWidth="1.5" strokeDasharray="4 2.5" />
+                          : <line x1="0" y1="4" x2="22" y2="4" stroke={l.color} strokeWidth="2" strokeLinecap="round" />}
+                      </svg>
+                      <span className={`text-[11px] font-medium ${textFaint}`}>{l.label}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="flex items-center gap-5">
-                {[
-                  { color: '#10b981', label: 'Concluídas', dash: false },
-                  { color: '#6366f1', label: 'Em andamento', dash: false },
-                  { color: dark ? 'rgba(255,255,255,.35)' : 'rgba(100,116,139,.55)', label: 'Previsto', dash: true },
-                ].map(l => (
-                  <div key={l.label} className="flex items-center gap-1.5">
-                    <svg width="22" height="8" className="flex-shrink-0">
-                      {l.dash
-                        ? <line x1="0" y1="4" x2="22" y2="4" stroke={l.color} strokeWidth="1.5" strokeDasharray="4 2.5" />
-                        : <line x1="0" y1="4" x2="22" y2="4" stroke={l.color} strokeWidth="2" strokeLinecap="round" />}
-                    </svg>
-                    <span className={`text-[11px] font-medium ${textFaint}`}>{l.label}</span>
-                  </div>
-                ))}
+              {/* linha 2: navegação semana + filtro mês */}
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <button onClick={prevWeek}
+                    className={`w-6 h-6 flex items-center justify-center rounded-lg border ${dark ? 'border-white/10 text-white/45 hover:bg-white/8 hover:text-white/75' : 'border-slate-200 text-slate-400 hover:bg-slate-100 hover:text-slate-700'} transition`}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                  </button>
+                  <span className={`text-xs font-semibold ${text} min-w-[180px] text-center`}>{weekLabel}</span>
+                  <button onClick={nextWeek}
+                    className={`w-6 h-6 flex items-center justify-center rounded-lg border ${dark ? 'border-white/10 text-white/45 hover:bg-white/8 hover:text-white/75' : 'border-slate-200 text-slate-400 hover:bg-slate-100 hover:text-slate-700'} transition`}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={chartMonth.month}
+                    onChange={e => { setChartMonth(prev => ({ ...prev, month: Number(e.target.value) })); setChartWeek(1) }}
+                    style={{ backgroundColor: dark ? '#0D1117' : undefined }}
+                    className={`text-xs font-medium px-2.5 py-1.5 rounded-lg border outline-none cursor-pointer ${dark ? 'border-white/10 text-white/65' : 'bg-white border-slate-200 text-slate-600'} transition`}>
+                    {monthNames.map((name, i) => (
+                      <option key={i} value={i} style={{ backgroundColor: dark ? '#0D1117' : 'white' }}>{name}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={chartMonth.year}
+                    onChange={e => { setChartMonth(prev => ({ ...prev, year: Number(e.target.value) })); setChartWeek(1) }}
+                    style={{ backgroundColor: dark ? '#0D1117' : undefined }}
+                    className={`text-xs font-medium px-2.5 py-1.5 rounded-lg border outline-none cursor-pointer ${dark ? 'border-white/10 text-white/65' : 'bg-white border-slate-200 text-slate-600'} transition`}>
+                    {availableYears.map(y => (
+                      <option key={y} value={y} style={{ backgroundColor: dark ? '#0D1117' : 'white' }}>{y}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -1249,6 +1405,140 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
+
+          {/* ── Analytics FastAPI ── */}
+          {analytics?.status && (
+            <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
+              <div className={`px-5 pt-4 pb-3 border-b ${dark ? 'border-white/5' : 'border-slate-100'}`}>
+                <p className={`text-sm font-semibold ${text}`}>Analytics</p>
+                <p className={`text-xs ${textFaint} mt-0.5`}>Métricas geradas pela FastAPI</p>
+              </div>
+
+              <div className="px-5 py-5 space-y-6">
+
+                {/* Status */}
+                <div>
+                  <p className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`}>Por Status</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[
+                      { label: 'Total',     value: analytics.status.data.total_tasks,      accent: 'text-violet-500' },
+                      { label: 'Pendente',  value: analytics.status.data.PENDING.count,    accent: dark ? 'text-white/55' : 'text-slate-500', sub: `${analytics.status.data.PENDING.percent}%` },
+                      { label: 'Andamento', value: analytics.status.data.IN_PROGRESS.count, accent: 'text-blue-400', sub: `${analytics.status.data.IN_PROGRESS.percent}%` },
+                      { label: 'Concluída', value: analytics.status.data.DONE.count,       accent: 'text-emerald-400', sub: `${analytics.status.data.DONE.percent}%` },
+                    ].map(s => (
+                      <div key={s.label} className={`${dark ? 'bg-white/[0.03] border-white/8' : 'bg-slate-50 border-slate-200'} border rounded-xl px-4 py-3`}>
+                        <p className={`text-[10px] font-semibold ${textFaint} uppercase tracking-widest`}>{s.label}</p>
+                        <p className={`text-xl font-black ${s.accent} leading-tight mt-1`}>{s.value}</p>
+                        {s.sub && <p className={`text-[10px] ${textFaint} mt-0.5`}>{s.sub}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Prioridade */}
+                {analytics.priority && (
+                  <div>
+                    <p className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`}>Por Prioridade</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { label: 'Alta',  value: analytics.priority.data.HIGH.count,   sub: `${analytics.priority.data.HIGH.percent}%`,   accent: 'text-red-400'     },
+                        { label: 'Média', value: analytics.priority.data.MEDIUM.count, sub: `${analytics.priority.data.MEDIUM.percent}%`, accent: 'text-amber-400'   },
+                        { label: 'Baixa', value: analytics.priority.data.LOW.count,    sub: `${analytics.priority.data.LOW.percent}%`,    accent: 'text-emerald-400' },
+                      ].map(s => (
+                        <div key={s.label} className={`${dark ? 'bg-white/[0.03] border-white/8' : 'bg-slate-50 border-slate-200'} border rounded-xl px-4 py-3`}>
+                          <p className={`text-[10px] font-semibold ${textFaint} uppercase tracking-widest`}>{s.label}</p>
+                          <p className={`text-xl font-black ${s.accent} leading-tight mt-1`}>{s.value}</p>
+                          <p className={`text-[10px] ${textFaint} mt-0.5`}>{s.sub}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Tempo médio */}
+                {analytics.averageTime && (
+                  <div>
+                    <p className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`}>Tempo Médio de Conclusão</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { label: 'Horas', value: analytics.averageTime.data.average_time_hours.toFixed(1) },
+                        { label: 'Dias',  value: analytics.averageTime.data.average_time_days.toFixed(1)  },
+                      ].map(s => (
+                        <div key={s.label} className={`${dark ? 'bg-white/[0.03] border-white/8' : 'bg-slate-50 border-slate-200'} border rounded-xl px-4 py-3`}>
+                          <p className={`text-[10px] font-semibold ${textFaint} uppercase tracking-widest`}>{s.label}</p>
+                          <p className={`text-xl font-black ${text} leading-tight mt-1`}>{s.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Throughput */}
+                <div>
+                  <p className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`}>Throughput — Tarefas por Dia</p>
+                  {analytics.throughput?.data.length ? (
+                    <div className={`${dark ? 'bg-white/[0.03] border-white/8' : 'bg-slate-50 border-slate-200'} border rounded-xl p-4`}>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <LineChart data={analytics.throughput.data}>
+                          <CartesianGrid stroke={dark ? 'rgba(255,255,255,.06)' : '#e2e8f0'} />
+                          <XAxis dataKey="day" stroke={dark ? 'rgba(255,255,255,.3)' : '#94a3b8'} tick={{ fontSize: 11, fill: dark ? 'rgba(255,255,255,.4)' : '#64748b' }} />
+                          <YAxis stroke={dark ? 'rgba(255,255,255,.3)' : '#94a3b8'} tick={{ fontSize: 11, fill: dark ? 'rgba(255,255,255,.4)' : '#64748b' }} />
+                          <Tooltip contentStyle={{ backgroundColor: dark ? '#1a2030' : '#fff', border: `1px solid ${dark ? 'rgba(255,255,255,.1)' : '#e2e8f0'}`, borderRadius: '8px', color: dark ? '#fff' : '#1e293b', fontSize: 12 }} />
+                          <Line type="monotone" dataKey="count" stroke="#7c3aed" strokeWidth={2} dot={{ fill: '#7c3aed', r: 3 }} name="Concluídas" />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className={`${dark ? 'border-white/8 text-white/25' : 'border-slate-200 text-slate-400'} border border-dashed rounded-xl px-4 py-3 text-xs`}>Dados insuficientes</div>
+                  )}
+                </div>
+
+                {/* Backlog */}
+                <div>
+                  <p className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`}>Evolução do Backlog</p>
+                  {analytics.backlog?.data.length ? (
+                    <div className={`${dark ? 'bg-white/[0.03] border-white/8' : 'bg-slate-50 border-slate-200'} border rounded-xl p-4`}>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={analytics.backlog.data}>
+                          <CartesianGrid stroke={dark ? 'rgba(255,255,255,.06)' : '#e2e8f0'} />
+                          <XAxis dataKey="date" stroke={dark ? 'rgba(255,255,255,.3)' : '#94a3b8'} tick={{ fontSize: 11, fill: dark ? 'rgba(255,255,255,.4)' : '#64748b' }} />
+                          <YAxis stroke={dark ? 'rgba(255,255,255,.3)' : '#94a3b8'} tick={{ fontSize: 11, fill: dark ? 'rgba(255,255,255,.4)' : '#64748b' }} />
+                          <Tooltip contentStyle={{ backgroundColor: dark ? '#1a2030' : '#fff', border: `1px solid ${dark ? 'rgba(255,255,255,.1)' : '#e2e8f0'}`, borderRadius: '8px', color: dark ? '#fff' : '#1e293b', fontSize: 12 }} />
+                          <Bar dataKey="criadas"    fill="#6366f1" name="Criadas"    radius={[3,3,0,0]} />
+                          <Bar dataKey="finalizadas" fill="#10b981" name="Finalizadas" radius={[3,3,0,0]} />
+                          <Bar dataKey="backlog"    fill="#ef4444" name="Backlog"    radius={[3,3,0,0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className={`${dark ? 'border-white/8 text-white/25' : 'border-slate-200 text-slate-400'} border border-dashed rounded-xl px-4 py-3 text-xs`}>Dados insuficientes</div>
+                  )}
+                </div>
+
+                {/* Response Time */}
+                <div>
+                  <p className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`}>SLA de Tempo de Resposta</p>
+                  {analytics.responseTime?.data.length ? (
+                    <div className={`${dark ? 'bg-white/[0.03] border-white/8' : 'bg-slate-50 border-slate-200'} border rounded-xl p-4`}>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <LineChart data={analytics.responseTime.data}>
+                          <CartesianGrid stroke={dark ? 'rgba(255,255,255,.06)' : '#e2e8f0'} />
+                          <XAxis dataKey="date" stroke={dark ? 'rgba(255,255,255,.3)' : '#94a3b8'} tick={{ fontSize: 11, fill: dark ? 'rgba(255,255,255,.4)' : '#64748b' }} />
+                          <YAxis stroke={dark ? 'rgba(255,255,255,.3)' : '#94a3b8'} tick={{ fontSize: 11, fill: dark ? 'rgba(255,255,255,.4)' : '#64748b' }} unit="%" />
+                          <Tooltip contentStyle={{ backgroundColor: dark ? '#1a2030' : '#fff', border: `1px solid ${dark ? 'rgba(255,255,255,.1)' : '#e2e8f0'}`, borderRadius: '8px', color: dark ? '#fff' : '#1e293b', fontSize: 12 }} formatter={(v: number) => `${v}%`} />
+                          <Line type="monotone" dataKey="slaPercentage" stroke="#f59e0b" strokeWidth={2} dot={{ fill: '#f59e0b', r: 3 }} name="SLA %" />
+                          <Line type="monotone" dataKey="target" stroke={dark ? 'rgba(255,255,255,.3)' : '#94a3b8'} strokeWidth={1.5} strokeDasharray="5 3" dot={false} name="Meta" />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className={`${dark ? 'border-white/8 text-white/25' : 'border-slate-200 text-slate-400'} border border-dashed rounded-xl px-4 py-3 text-xs`}>Dados insuficientes</div>
+                  )}
+                </div>
+
+              </div>
+            </div>
+          )}
 
         </div>
       </main>
