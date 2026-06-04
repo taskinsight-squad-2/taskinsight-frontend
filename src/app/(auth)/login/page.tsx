@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { translations, type Locale } from '@/lib/i18n'
+import { authService } from '@/services/auth.service'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -23,8 +24,13 @@ export default function LoginPage() {
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault(); setError(''); setLoading(true)
-    try { await new Promise(r => setTimeout(r, 800)); router.push('/dashboard') }
-    catch { setError(t.invalidCredentials) }
+    try {
+      const data = await authService.login(loginForm.email, loginForm.password)
+      localStorage.setItem('token', data.token)
+      localStorage.setItem('user', JSON.stringify(data.user))
+      router.push('/dashboard')
+    }
+    catch (err: any) { setError(err.message || t.invalidCredentials) }
     finally { setLoading(false) }
   }
 
@@ -32,8 +38,13 @@ export default function LoginPage() {
     e.preventDefault(); setError('')
     if (registerForm.password !== registerForm.confirm) { setError(t.passwordMismatch); return }
     setLoading(true)
-    try { await new Promise(r => setTimeout(r, 800)); router.push('/dashboard?new=true') }
-    catch { setError(t.registerError) }
+    try {
+      const data = await authService.register(registerForm.name, registerForm.email, registerForm.password)
+      localStorage.setItem('token', data.token)
+      localStorage.setItem('user', JSON.stringify(data.user))
+      router.push('/dashboard?new=true')
+    }
+    catch (err: any) { setError(err.message || t.registerError) }
     finally { setLoading(false) }
   }
 

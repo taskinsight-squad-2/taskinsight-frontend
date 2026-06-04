@@ -1,28 +1,34 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { translations, type Locale } from '@/lib/i18n'
+import { taskService } from '@/services/task.service'
+import type { Task as ApiTask } from '@/types/task'
 
 type Priority = 'High' | 'Medium' | 'Low'
 type Status   = 'Pending' | 'InProgress' | 'Done'
 type FilterTab = 'All' | 'Pending' | 'InProgress' | 'Done'
+type SortMode  = 'default' | 'created' | 'completed' | 'overdue'
 
 interface TaskDates {
-  created:   string        // sempre preenchido
-  started:   string | null // preenchido ao clicar "Iniciar"
-  finished:  string | null // preenchido ao clicar "Concluir"
-  deadline:  string | null // meta do usuário
+  created:   string
+  started:   string | null
+  finished:  string | null
+  deadline:  string | null
 }
 
-const tasksMeta: { priority: Priority; status: Status }[] = [
-  { priority: 'High',   status: 'Pending'    },
-  { priority: 'High',   status: 'InProgress' },
-  { priority: 'Medium', status: 'Done'       },
-  { priority: 'Low',    status: 'Pending'    },
-  { priority: 'Medium', status: 'Done'       },
-  { priority: 'Low',    status: 'InProgress' },
-]
+function mapStatus(s: ApiTask['status']): Status {
+  if (s === 'IN_PROGRESS') return 'InProgress'
+  if (s === 'DONE')        return 'Done'
+  return 'Pending'
+}
+
+function mapPriority(p: ApiTask['priority']): Priority {
+  if (p === 'HIGH')   return 'High'
+  if (p === 'MEDIUM') return 'Medium'
+  return 'Low'
+}
 
 function today() { return new Date().toISOString().slice(0, 10) }
 function fmt(d: string | null) {
@@ -46,75 +52,192 @@ export default function DashboardPage() {
   const [filter, setFilter]           = useState<FilterTab>('All')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sortMode, setSortMode]       = useState<SortMode>('default')
   const [pageSize, setPageSize]       = useState(5)
   const [page, setPage]               = useState(1)
 
+  // ── API tasks ────────────────────────────────────────────────────
+  const [apiTasks, setApiTasks] = useState<ApiTask[]>([])
+  const [loadingTasks, setLoadingTasks] = useState(true)
+
+  const fetchTasks = useCallback(async () => {
+    const token = localStorage.getItem('token') ?? undefined
+    try {
+      const data = await taskService.getAll(token)
+      setApiTasks(Array.isArray(data) ? data : [])
+    } catch {
+      setApiTasks([])
+    } finally {
+      setLoadingTasks(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchTasks() }, [fetchTasks])
+
   // ── task state ───────────────────────────────────────────────────
-  const initDates: Record<number, TaskDates> = Object.fromEntries(
-    tasksMeta.map((m, i) => {
-      const id = i + 1
-      const created  = today()
-      const started  = m.status !== 'Pending'    ? today() : null
-      const finished = m.status === 'Done'        ? today() : null
-      return [id, { created, started, finished, deadline: null }]
-    })
-  )
-  const [taskStatuses,  setTaskStatuses]  = useState<Record<number, Status>>(
-    isNew ? {} : Object.fromEntries(tasksMeta.map((m, i) => [i + 1, m.status]))
-  )
-  const [taskDates,  setTaskDates]  = useState<Record<number, TaskDates>>(isNew ? {} : initDates)
-  const [expanded,   setExpanded]   = useState<Record<number, boolean>>({})
-  const [editing,    setEditing]    = useState<Record<number, boolean>>({})
-  const [descriptions, setDescriptions] = useState<Record<number, string>>({})
-  const [draftDesc,  setDraftDesc]  = useState<Record<number, string>>({})
-  const [deadlineDraft, setDeadlineDraft] = useState<Record<number, string>>({})
+  const [taskStatuses,  setTaskStatuses]  = useState<Record<string, Status>>({})
+  const [taskDates,  setTaskDates]  = useState<Record<string, TaskDates>>({})
+
+  useEffect(() => {
+    if (apiTasks.length === 0) return
+    setTaskStatuses(Object.fromEntries(apiTasks.map(t => [t._id, mapStatus(t.status)])))
+    setTaskDates(Object.fromEntries(apiTasks.map(t => [t._id, {
+      created:  t.createdAt?.slice(0, 10) ?? today(),
+      started:  t.startedAt?.slice(0, 10) ?? null,
+      finished: t.completedAt?.slice(0, 10) ?? null,
+      deadline: t.dueDate?.slice(0, 10) ?? null,
+    }])))
+    setDeadlineHistory(Object.fromEntries(
+      apiTasks
+        .filter(t => t.deadlineHistory?.length)
+        .map(t => [t._id, t.deadlineHistory!.map(entry => ({
+          oldDate:   entry.oldDate ? entry.oldDate.slice(0, 10) : null,
+          newDate:   entry.newDate.slice(0, 10),
+          reason:    entry.reason,
+          changedAt: new Date(entry.changedAt).toLocaleDateString('pt-BR'),
+        }))])
+    ))
+    setDescriptions(Object.fromEntries(apiTasks.filter(t => t.description).map(t => [t._id, t.description])))
+  }, [apiTasks])
+  const [expanded,   setExpanded]   = useState<Record<string, boolean>>({})
+  const [editing,    setEditing]    = useState<Record<string, boolean>>({})
+  const [descriptions, setDescriptions] = useState<Record<string, string>>({})
+  const [draftDesc,  setDraftDesc]  = useState<Record<string, string>>({})
+  const [deadlineDraft, setDeadlineDraft] = useState<Record<string, string>>({})
+  const [editingDeadlineId, setEditingDeadlineId] = useState<string | null>(null)
+  const [confirmDeadlineId, setConfirmDeadlineId] = useState<string | null>(null)
+  const [deadlineChangeReason, setDeadlineChangeReason] = useState('')
+  const [deadlineChangeStep, setDeadlineChangeStep] = useState<'ask' | 'edit' | null>(null)
+  const [deadlineHistory, setDeadlineHistory] = useState<Record<string, Array<{newDate: string, reason: string, changedAt: string}>>>({})
+  const [editingTitle, setEditingTitle] = useState<Record<string, boolean>>({})
+  const [draftTitle,   setDraftTitle]   = useState<Record<string, string>>({})
   const [toastMsg, setToastMsg]     = useState('')
+  const [chartHoverIdx, setChartHoverIdx] = useState<number | null>(null)
 
   function showToast(msg: string) {
     setToastMsg(msg)
     setTimeout(() => setToastMsg(''), 3000)
   }
 
-  function startTask(id: number) {
-    setTaskStatuses(prev => ({ ...prev, [id]: 'InProgress' }))
-    setTaskDates(prev => ({ ...prev, [id]: { ...prev[id], started: today() } }))
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? undefined : undefined
+
+  const [confirmStartId, setConfirmStartId] = useState<string | null>(null)
+
+  async function confirmStart(id: string) {
+    setConfirmStartId(null)
+    await taskService.update(id, { status: 'IN_PROGRESS' }, token).catch(() => {})
+    await fetchTasks()
   }
-  function finishTask(id: number) {
+  async function finishTask(id: string) {
     const dates = taskDates[id]
     if (!dates?.started) { showToast('⚠ Inicie a tarefa antes de concluí-la.'); return }
     setTaskStatuses(prev => ({ ...prev, [id]: 'Done' }))
     setTaskDates(prev => ({ ...prev, [id]: { ...prev[id], finished: today() } }))
+    await taskService.update(id, { status: 'DONE' }, token).catch(() => {})
   }
-  function reopenTask(id: number) {
+  async function reopenTask(id: string) {
     setTaskStatuses(prev => ({ ...prev, [id]: 'InProgress' }))
     setTaskDates(prev => ({ ...prev, [id]: { ...prev[id], finished: null } }))
+    await taskService.update(id, { status: 'IN_PROGRESS' }, token).catch(() => {})
   }
-  function saveDeadline(id: number) {
-    const val = deadlineDraft[id]
+  async function saveDeadline(id: string) {
+    const val = deadlineDraft[id] ?? ''
     if (!val) return
+    const hasExisting = !!taskDates[id]?.deadline
+    if (hasExisting) { setConfirmDeadlineId(id); return }
+    const isoVal = new Date(val + 'T12:00:00.000Z').toISOString()
     setTaskDates(prev => ({ ...prev, [id]: { ...prev[id], deadline: val } }))
+    setEditingDeadlineId(null)
+    await taskService.update(id, { dueDate: isoVal }, token).catch(() => {})
+    showToast('✓ Prazo salvo!')
   }
 
-  function toggleExpand(id: number) { setExpanded(prev => ({ ...prev, [id]: !prev[id] })) }
-  function startEdit(id: number)    { setDraftDesc(prev => ({ ...prev, [id]: descriptions[id] ?? '' })); setEditing(prev => ({ ...prev, [id]: true })) }
-  function saveDesc(id: number)     { setDescriptions(prev => ({ ...prev, [id]: draftDesc[id] ?? '' })); setEditing(prev => ({ ...prev, [id]: false })) }
-  function cancelEdit(id: number)   { setEditing(prev => ({ ...prev, [id]: false })) }
+  async function confirmDeadlineChange(id: string) {
+    const val = deadlineDraft[id] || taskDates[id]?.deadline || ''
+    if (!val || !deadlineChangeReason.trim()) return
+    const isoVal = new Date(val + 'T12:00:00.000Z').toISOString()
+    const changedAt = new Date().toLocaleDateString('pt-BR')
+    const oldDate = taskDates[id]?.deadline ?? null
+    setDeadlineHistory(prev => ({
+      ...prev,
+      [id]: [...(prev[id] ?? []), { oldDate, newDate: val, reason: deadlineChangeReason.trim(), changedAt }]
+    }))
+    setTaskDates(prev => ({ ...prev, [id]: { ...prev[id], deadline: val } }))
+    setEditingDeadlineId(null)
+    setConfirmDeadlineId(null)
+    setDeadlineChangeStep(null)
+    setDeadlineChangeReason('')
+    setDeadlineDraft(prev => ({ ...prev, [id]: '' }))
+    await taskService.update(id, { dueDate: isoVal, deadlineChangeReason: deadlineChangeReason.trim() }, token).catch(() => {})
+    showToast('✓ Prazo atualizado!')
+  }
 
-  function completeAll() { setTaskStatuses(prev => Object.fromEntries(Object.keys(prev).map(k => [k, 'Done']))) }
+  function toggleExpand(id: string) { setExpanded(prev => ({ ...prev, [id]: !prev[id] })) }
+  function startEdit(id: string)    { setDraftDesc(prev => ({ ...prev, [id]: descriptions[id] ?? '' })); setEditing(prev => ({ ...prev, [id]: true })) }
+  function saveDesc(id: string)     { setDescriptions(prev => ({ ...prev, [id]: draftDesc[id] ?? '' })); setEditing(prev => ({ ...prev, [id]: false })) }
+  function cancelEdit(id: string)   { setEditing(prev => ({ ...prev, [id]: false })) }
+
+  function startEditTitle(id: string, current: string) {
+    setDraftTitle(prev => ({ ...prev, [id]: current }))
+    setEditingTitle(prev => ({ ...prev, [id]: true }))
+  }
+  async function saveTitle(id: string) {
+    const val = draftTitle[id]?.trim()
+    if (!val) return
+    setApiTasks(prev => prev.map(t => t._id === id ? { ...t, title: val } : t))
+    setEditingTitle(prev => ({ ...prev, [id]: false }))
+    await taskService.update(id, { title: val }, token).catch(() => {})
+  }
+  function cancelEditTitle(id: string) { setEditingTitle(prev => ({ ...prev, [id]: false })) }
+
+  async function saveDescToBank(id: string) {
+    const val = draftDesc[id] ?? ''
+    setDescriptions(prev => ({ ...prev, [id]: val }))
+    setEditing(prev => ({ ...prev, [id]: false }))
+    await taskService.update(id, { description: val }, token).catch(() => {})
+  }
+
+  // ── criar tarefa ─────────────────────────────────────────────────
+  const [showNewTask, setShowNewTask] = useState(false)
+  const [newTaskForm, setNewTaskForm] = useState({ title: '', description: '', priority: 'MEDIUM' as ApiTask['priority'] })
+  const [savingTask, setSavingTask]   = useState(false)
+
+  async function handleCreateTask(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newTaskForm.title.trim()) return
+    setSavingTask(true)
+    try {
+      await taskService.create({ title: newTaskForm.title, description: newTaskForm.description, priority: newTaskForm.priority }, token)
+      setNewTaskForm({ title: '', description: '', priority: 'MEDIUM' })
+      setShowNewTask(false)
+      await fetchTasks()
+      showToast('✓ Tarefa criada com sucesso!')
+    } catch { showToast('Erro ao criar tarefa.') }
+    finally { setSavingTask(false) }
+  }
+
+  function handleLogout() {
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    router.push('/login')
+  }
+
+  function completeAll() { setTaskStatuses(prev => Object.fromEntries(Object.keys(prev).map(k => [k, 'Done' as Status]))) }
   function clearDone()   { setTaskStatuses(prev => Object.fromEntries(Object.entries(prev).filter(([, v]) => v !== 'Done'))) }
 
   // ── derived data ─────────────────────────────────────────────────
-  const tasks = useMemo(() => isNew ? [] : tasksMeta.map((meta, i) => ({
-    id: i + 1,
-    title: t.tasks[i].title,
-    category: t.tasks[i].category,
-    priority: meta.priority,
-    status: (taskStatuses[i + 1] ?? meta.status) as Status,
-  })), [t, taskStatuses, isNew])
-
-  const categories = useMemo(() => Object.entries(t.categoryLabels).map(([, label], i) => ({
-    label, count: [2, 2, 1, 1][i],
-  })), [t])
+  const tasks = useMemo(() => apiTasks.map(apiTask => ({
+    id: apiTask._id,
+    title: apiTask.title,
+    category: apiTask.description ?? '',
+    priority: mapPriority(apiTask.priority),
+    status: (taskStatuses[apiTask._id] ?? mapStatus(apiTask.status)) as Status,
+  })), [apiTasks, taskStatuses])
+  const categories = useMemo(() => [
+    { label: t.priorityHigh,   count: tasks.filter(t => t.priority === 'High').length },
+    { label: t.priorityMedium, count: tasks.filter(t => t.priority === 'Medium').length },
+    { label: t.priorityLow,    count: tasks.filter(t => t.priority === 'Low').length },
+  ], [tasks, t])
 
   const total      = tasks.length
   const nPending   = tasks.filter(t => t.status === 'Pending').length
@@ -122,7 +245,19 @@ export default function DashboardPage() {
   const nDone      = tasks.filter(t => t.status === 'Done').length
   const completion = total > 0 ? Math.round((nDone / total) * 100) : 0
 
-  const filtered = filter === 'All' ? tasks : tasks.filter(t => t.status === filter)
+  const nOverdue = useMemo(() => tasks.filter(t =>
+    (t.status === 'Pending' || t.status === 'InProgress') &&
+    taskDates[t.id]?.deadline && taskDates[t.id].deadline! < today()
+  ).length, [tasks, taskDates])
+
+  const filtered = useMemo(() => {
+    let list = filter === 'All' ? tasks : tasks.filter(t => t.status === filter)
+    if (sortMode === 'created')   list = [...list].sort((a, b) => (taskDates[a.id]?.created ?? '').localeCompare(taskDates[b.id]?.created ?? ''))
+    if (sortMode === 'completed') list = [...list].filter(t => taskDates[t.id]?.finished).sort((a, b) => (taskDates[b.id]?.finished ?? '').localeCompare(taskDates[a.id]?.finished ?? ''))
+    if (sortMode === 'overdue')   list = [...list].filter(t => (t.status === 'Pending' || t.status === 'InProgress') && taskDates[t.id]?.deadline && taskDates[t.id].deadline! < today())
+    return list
+  }, [filter, tasks, sortMode, taskDates])
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const safePage   = Math.min(page, totalPages)
   const paginated  = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
@@ -130,6 +265,7 @@ export default function DashboardPage() {
   // reset page on filter/pageSize change
   function setFilterReset(f: FilterTab) { setFilter(f); setPage(1) }
   function setPageSizeReset(n: number)  { setPageSize(n); setPage(1) }
+  function setSortReset(s: SortMode)    { setSortMode(s); setPage(1) }
 
   // ── tokens por tema ───────────────────────────────────────────────
   const pageBg       = dark ? 'bg-[#080B14]'    : 'bg-[#F4F6FB]'
@@ -197,11 +333,11 @@ export default function DashboardPage() {
     Done:       { color: 'bg-emerald-50 text-emerald-600 border border-emerald-200', label: 'Concluída' },
   }
 
-  const navItems = [
-    { label: t.dashboard, icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>, active: true },
-    { label: t.allTasks,  icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>, active: false },
-    { label: t.pending,   icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>, active: false },
-    { label: t.completed, icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>, active: false },
+  const navItems: { label: string; icon: React.ReactNode; sort: SortMode; badge?: number }[] = [
+    { label: t.dashboard, sort: 'default', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg> },
+    { label: 'Por Criação', sort: 'created', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> },
+    { label: 'Por Conclusão', sort: 'completed', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> },
+    { label: 'Em Atraso', sort: 'overdue', badge: nOverdue, icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> },
   ]
 
   const filterTabs: { key: FilterTab; label: string }[] = [
@@ -211,23 +347,51 @@ export default function DashboardPage() {
     { key: 'Done', label: t.statusDone },
   ]
 
-  // ── dados dos gráficos ───────────────────────────────────────────
-  // Séries: eixo X = semanas (simuladas), cada ponto acumula tarefas
-  // Previsto: distribuição linear ideal de conclusão ao longo das semanas
-  const weeks = ['S1', 'S2', 'S3', 'S4', 'S5', 'S6']
-  const nWeeks = weeks.length
-  // Previsto: linha reta de 0 até total
-  const plannedSeries = weeks.map((_, i) => Math.round((total / (nWeeks - 1)) * i))
-  // Concluídas acumuladas (simuladas com base no nDone)
-  const doneSeries    = [0, 0, Math.round(nDone * 0.3), Math.round(nDone * 0.6), nDone, nDone]
-  // Em andamento acumulado
-  const progressSeries = [0, nProgress > 0 ? 1 : 0, nProgress > 0 ? Math.round(nProgress * 0.5) : 0,
-    nProgress, nProgress, nProgress]
+  // ── dados dos gráficos ─────────────────────────────────────────
+  const chartData = useMemo(() => {
+    const allDates = apiTasks
+      .map(t => t.createdAt?.slice(0, 10))
+      .filter(Boolean) as string[]
+    if (allDates.length === 0) return null
 
-  const GW = 500; const GH = 160; const GP = 32
-  const gMax = Math.max(...plannedSeries, ...doneSeries, ...progressSeries, 1)
-  function gx(i: number) { return GP + i * ((GW - GP * 2) / (nWeeks - 1)) }
-  function gy(v: number) { return GH - GP - Math.round((v / gMax) * (GH - GP * 2)) }
+    const minDate = allDates.reduce((a, b) => a < b ? a : b)
+    const maxDate = today()
+    const totalDays = Math.max(1, daysBetween(minDate, maxDate) ?? 1)
+    // gera até 6 pontos uniformemente distribuídos
+    const nPoints = Math.min(6, totalDays + 1)
+    const points = Array.from({ length: nPoints }, (_, i) => {
+      const d = new Date(minDate)
+      d.setDate(d.getDate() + Math.round((totalDays / (nPoints - 1)) * i))
+      return d.toISOString().slice(0, 10)
+    })
+
+    const planned = points.map((_, i) => Math.round((total / (nPoints - 1)) * i))
+    const done = points.map(date => apiTasks.filter(t => {
+      const isDone   = taskStatuses[t._id] === 'Done'
+      const finished = taskDates[t._id]?.finished ?? (isDone ? today() : null)
+      return finished && finished <= date
+    }).length)
+    const progress = points.map(date => apiTasks.filter(t => {
+      if (taskStatuses[t._id] === 'Done') return false
+      const started  = taskDates[t._id]?.started
+      const finished = taskDates[t._id]?.finished
+      return started && started <= date && (!finished || finished > date)
+    }).length)
+
+    // labels: dia/mês
+    const labels = points.map(d => { const [,m,day] = d.split('-'); return `${day}/${m}` })
+    return { points, planned, done, progress, labels }
+  }, [apiTasks, taskDates, taskStatuses, total])
+
+  const GW = 560; const GH = 220; const GP = 44
+  const nPoints  = chartData?.labels.length ?? 6
+  const plannedSeries  = chartData?.planned  ?? [0,0,0,0,0,0]
+  const doneSeries     = chartData?.done     ?? [0,0,0,0,0,0]
+  const progressSeries = chartData?.progress ?? [0,0,0,0,0,0]
+  const chartLabels    = chartData?.labels   ?? ['','','','','','']
+  const gMax = Math.max(...plannedSeries, ...doneSeries, ...progressSeries, total, 1)
+  function gx(i: number) { return GP + i * ((GW - GP * 2) / Math.max(1, nPoints - 1)) }
+  function gy(v: number) { return GH - GP - Math.round(((v - 1) / Math.max(1, gMax - 1)) * (GH - GP * 2)) }
   function makePath(series: number[]) {
     return series.map((v, i) => {
       if (i === 0) return `M ${gx(i)} ${gy(v)}`
@@ -239,10 +403,9 @@ export default function DashboardPage() {
   const pathPlanned  = makePath(plannedSeries)
   const pathDone     = makePath(doneSeries)
   const pathProgress = makePath(progressSeries)
-  // área de desvio entre previsto e concluídas
-  const areaDeviation = `${pathDone} L ${gx(nWeeks-1)} ${gy(plannedSeries[nWeeks-1])} ` +
+  const areaDeviation = `${pathDone} L ${gx(nPoints-1)} ${gy(plannedSeries[nPoints-1])} ` +
     [...plannedSeries].reverse().map((v, i) => {
-      const ri = nWeeks - 1 - i
+      const ri = nPoints - 1 - i
       if (i === 0) return `L ${gx(ri)} ${gy(v)}`
       const next = plannedSeries[ri + 1]
       const cx = (gx(ri) + gx(ri + 1)) / 2
@@ -282,11 +445,15 @@ export default function DashboardPage() {
         {navItems.map(item => (
           <button key={item.label}
             title={collapsed ? item.label : undefined}
+            onClick={() => setSortReset(item.sort)}
             className={`flex items-center rounded-xl text-sm font-medium transition-all w-full ${
               collapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5 text-left'
-            } ${item.active ? navAct : navInact}`}>
+            } ${sortMode === item.sort ? navAct : navInact}`}>
             {item.icon}
-            {!collapsed && item.label}
+            {!collapsed && <span className="flex-1">{item.label}</span>}
+            {!collapsed && item.badge !== undefined && item.badge > 0 && (
+              <span className="text-[10px] font-bold bg-red-500 text-white rounded-full px-1.5 py-0.5 leading-none">{item.badge}</span>
+            )}
           </button>
         ))}
 
@@ -312,7 +479,7 @@ export default function DashboardPage() {
               <p className={`text-sm font-semibold ${text} truncate`}>Hugo</p>
               <p className={`text-xs ${userPlan}`}>{t.freePlan}</p>
             </div>
-            <button onClick={() => router.push('/login')} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 transition">
+            <button onClick={handleLogout} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 transition">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
               {t.signOut}
             </button>
@@ -324,6 +491,164 @@ export default function DashboardPage() {
 
   return (
     <div className={`min-h-screen flex ${pageBg} ${text} transition-colors duration-300`}>
+
+      {/* modal nova tarefa */}
+      {showNewTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowNewTask(false)} />
+          <div className={`relative w-full max-w-md mx-4 ${dark ? 'bg-[#0D1117] border-white/10' : 'bg-white border-slate-200'} border rounded-2xl p-6 shadow-2xl`}>
+            <h2 className={`text-base font-bold ${dark ? 'text-white' : 'text-slate-900'} mb-5`}>Nova Tarefa</h2>
+            <form onSubmit={handleCreateTask} className="flex flex-col gap-4">
+              <div>
+                <label className={`text-xs font-semibold ${dark ? 'text-white/65' : 'text-slate-600'} uppercase tracking-widest mb-1.5 block`}>Título</label>
+                <input required placeholder="Nome da tarefa" value={newTaskForm.title}
+                  onChange={e => setNewTaskForm(f => ({ ...f, title: e.target.value }))}
+                  className={dark ? 'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-white/40 outline-none focus:border-violet-500/60 transition' : 'w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-violet-400 transition'} />
+              </div>
+              <div>
+                <label className={`text-xs font-semibold ${dark ? 'text-white/65' : 'text-slate-600'} uppercase tracking-widest mb-1.5 block`}>Descrição</label>
+                <textarea rows={3} placeholder="Descrição opcional" value={newTaskForm.description}
+                  onChange={e => setNewTaskForm(f => ({ ...f, description: e.target.value }))}
+                  className={dark ? 'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-white/40 outline-none focus:border-violet-500/60 resize-none transition' : 'w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-violet-400 resize-none transition'} />
+              </div>
+              <div>
+                <label className={`text-xs font-semibold ${dark ? 'text-white/65' : 'text-slate-600'} uppercase tracking-widest mb-1.5 block`}>Prioridade</label>
+                <select value={newTaskForm.priority} onChange={e => setNewTaskForm(f => ({ ...f, priority: e.target.value as ApiTask['priority'] }))}
+                  className={dark ? 'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-violet-500/60 transition' : 'w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 outline-none focus:border-violet-400 transition'}>
+                  <option value="HIGH">Alta</option>
+                  <option value="MEDIUM">Média</option>
+                  <option value="LOW">Baixa</option>
+                </select>
+              </div>
+              <div className="flex gap-2 justify-end mt-1">
+                <button type="button" onClick={() => setShowNewTask(false)}
+                  className={`px-4 py-2 rounded-xl text-sm border ${dark ? 'border-white/10 text-white/50 hover:bg-white/5' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} transition`}>
+                  Cancelar
+                </button>
+                <button type="submit" disabled={savingTask}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 transition disabled:opacity-50">
+                  {savingTask ? 'Salvando...' : 'Criar Tarefa'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* modal alterar prazo — 2 etapas */}
+      {confirmDeadlineId && (() => {
+        const taskTitle = tasks.find(t => t.id === confirmDeadlineId)?.title ?? ''
+        const oldDate   = fmt(taskDates[confirmDeadlineId]?.deadline ?? null)
+        const newDate   = fmt(deadlineDraft[confirmDeadlineId] ?? null)
+        const closeModal = () => { setConfirmDeadlineId(null); setDeadlineChangeStep(null); setDeadlineChangeReason(''); setDeadlineDraft(prev => ({ ...prev, [confirmDeadlineId]: '' })) }
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeModal} />
+            <div className={`relative w-full max-w-sm mx-4 ${dark ? 'bg-[#0D1117] border-white/10' : 'bg-white border-slate-200'} border rounded-2xl p-6 shadow-2xl`}>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 flex-shrink-0">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </div>
+                <div>
+                  <p className={`text-sm font-bold ${dark ? 'text-white' : 'text-slate-900'}`}>
+                    {deadlineChangeStep === 'ask' ? 'Deseja alterar o prazo?' : 'Informe a nova data e o motivo'}
+                  </p>
+                  <p className={`text-xs ${dark ? 'text-white/40' : 'text-slate-400'}`}>
+                    {deadlineChangeStep === 'ask' ? <>Prazo atual: <span className="text-violet-500 font-semibold">{oldDate}</span></> : <>{oldDate} → <span className="text-violet-500 font-semibold">{newDate || '?'}</span></>}
+                  </p>
+                </div>
+              </div>
+              <p className={`text-xs ${dark ? 'text-white/55' : 'text-slate-500'} mb-4`}>
+                <span className={`font-semibold ${dark ? 'text-white/80' : 'text-slate-700'}`}>{taskTitle}</span>
+              </p>
+
+              {/* etapa 1: confirmação */}
+              {deadlineChangeStep === 'ask' && (
+                <div className="flex gap-2 justify-end">
+                  <button onClick={closeModal}
+                    className={`px-4 py-2 rounded-xl text-sm border ${dark ? 'border-white/10 text-white/50 hover:bg-white/5' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} transition`}>
+                    Não, cancelar
+                  </button>
+                  <button onClick={() => setDeadlineChangeStep('edit')}
+                    className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 transition">
+                    Sim, alterar
+                  </button>
+                </div>
+              )}
+
+              {/* etapa 2: nova data + justificativa */}
+              {deadlineChangeStep === 'edit' && (
+                <>
+                  <div className="mb-3">
+                    <label className={`text-xs font-semibold ${dark ? 'text-white/50' : 'text-slate-500'} uppercase tracking-widest mb-1.5 block`}>Nova data</label>
+                    <input type="date"
+                      value={deadlineDraft[confirmDeadlineId] ?? ''}
+                      onChange={e => setDeadlineDraft(prev => ({ ...prev, [confirmDeadlineId]: e.target.value }))}
+                      className={dark ? 'w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50 transition' : 'w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 outline-none focus:border-amber-400 transition'} />
+                  </div>
+                  <div className="mb-4">
+                    <label className={`text-xs font-semibold ${dark ? 'text-white/50' : 'text-slate-500'} uppercase tracking-widest mb-1.5 block`}>Motivo da alteração</label>
+                    <textarea rows={2} placeholder="Ex: cliente solicitou extensão do prazo..."
+                      value={deadlineChangeReason}
+                      onChange={e => setDeadlineChangeReason(e.target.value)}
+                      className={dark ? 'w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-amber-500/50 resize-none transition' : 'w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-amber-400 resize-none transition'} />
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <button onClick={closeModal}
+                      className={`px-4 py-2 rounded-xl text-sm border ${dark ? 'border-white/10 text-white/50 hover:bg-white/5' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} transition`}>
+                      Cancelar
+                    </button>
+                    <button onClick={() => confirmDeadlineChange(confirmDeadlineId)}
+                      disabled={!deadlineChangeReason.trim() || !deadlineDraft[confirmDeadlineId]}
+                      className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 transition disabled:opacity-40 disabled:cursor-not-allowed">
+                      Confirmar
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* modal confirmar início */}
+      {confirmStartId && (() => {
+        const task = tasks.find(t => t.id === confirmStartId)!
+        const priorityLabel = task?.priority === 'High' ? t.priorityHigh : task?.priority === 'Medium' ? t.priorityMedium : t.priorityLow
+        const priorityColor = task?.priority === 'High' ? 'text-red-500' : task?.priority === 'Medium' ? 'text-amber-500' : 'text-emerald-500'
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setConfirmStartId(null)} />
+            <div className={`relative w-full max-w-sm mx-4 ${dark ? 'bg-[#0D1117] border-white/10' : 'bg-white border-slate-200'} border rounded-2xl p-6 shadow-2xl`}>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500 flex-shrink-0">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </div>
+                <div>
+                  <p className={`text-sm font-bold ${dark ? 'text-white' : 'text-slate-900'}`}>Iniciar tarefa agora?</p>
+                  <p className={`text-xs ${dark ? 'text-white/40' : 'text-slate-400'}`}>Prioridade: <span className={`font-semibold ${priorityColor}`}>{priorityLabel}</span></p>
+                </div>
+              </div>
+              <p className={`text-xs ${dark ? 'text-white/55' : 'text-slate-500'} mb-1`}>
+                <span className={`font-semibold ${dark ? 'text-white/80' : 'text-slate-700'}`}>{task?.title}</span>
+              </p>
+              <p className={`text-xs ${dark ? 'text-white/40' : 'text-slate-400'} mb-5`}>
+                Ao iniciar, o tempo começa a ser contado. Certifique-se de que vai trabalhar nela agora.
+              </p>
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setConfirmStartId(null)}
+                  className={`px-4 py-2 rounded-xl text-sm border ${dark ? 'border-white/10 text-white/50 hover:bg-white/5' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} transition`}>
+                  Agora não
+                </button>
+                <button onClick={() => confirmStart(confirmStartId)}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 transition shadow-lg shadow-blue-500/25">
+                  Sim, iniciar!
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* toast */}
       {toastMsg && (
@@ -363,7 +688,7 @@ export default function DashboardPage() {
               className={`w-8 h-8 flex items-center justify-center rounded-lg border ${ctrlBg} hover:opacity-80 transition text-sm`}>
               {dark ? '☀️' : '🌙'}
             </button>
-            <button className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-xs font-semibold hover:from-violet-500 hover:to-indigo-500 transition shadow-lg shadow-violet-500/25">
+            <button onClick={() => setShowNewTask(true)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-xs font-semibold hover:from-violet-500 hover:to-indigo-500 transition shadow-lg shadow-violet-500/25">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               {t.newTask}
             </button>
@@ -371,6 +696,11 @@ export default function DashboardPage() {
         </div>
 
         <div className="px-6 py-6 flex flex-col gap-5">
+          {loadingTasks && (
+            <div className="flex items-center justify-center py-10">
+              <span className="w-6 h-6 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
+            </div>
+          )}
 
           {/* ── Stats compactos ── */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -470,21 +800,44 @@ export default function DashboardPage() {
                             <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                           </button>
                         ) : (
-                          <button onClick={() => startTask(task.id)} title="Iniciar"
+                          <button onClick={() => setConfirmStartId(task.id)} title="Iniciar"
                             className={`w-5 h-5 flex items-center justify-center rounded-full border-2 ${checkEmpty} transition`} />
                         )}
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium truncate transition ${isDone ? taskDoneCls : taskActiveCls}`}>
-                          {task.title}
-                        </p>
+                        {editingTitle[task.id] ? (
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              autoFocus
+                              value={draftTitle[task.id] ?? ''}
+                              onChange={e => setDraftTitle(prev => ({ ...prev, [task.id]: e.target.value }))}
+                              onKeyDown={e => { if (e.key === 'Enter') saveTitle(task.id); if (e.key === 'Escape') cancelEditTitle(task.id) }}
+                              className={`flex-1 text-sm font-medium rounded-lg px-2 py-1 outline-none border ${
+                                dark ? 'bg-white/5 border-white/15 text-white' : 'bg-white border-slate-300 text-slate-900'
+                              } transition`}
+                            />
+                            <button onClick={() => saveTitle(task.id)} className="text-[10px] px-2 py-1 rounded-md bg-violet-600 hover:bg-violet-500 text-white font-semibold transition">ok</button>
+                            <button onClick={() => cancelEditTitle(task.id)} className={`text-[10px] px-2 py-1 rounded-md border ${ dark ? 'border-white/10 text-white/50' : 'border-slate-200 text-slate-400'} transition`}>✕</button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 group/title">
+                            <p className={`text-sm font-medium truncate transition ${isDone ? taskDoneCls : taskActiveCls}`}>{task.title}</p>
+                            <button
+                              onClick={() => startEditTitle(task.id, task.title)}
+                              className={`opacity-0 group-hover/title:opacity-100 transition ${ dark ? 'text-white/30 hover:text-white/60' : 'text-slate-300 hover:text-slate-500'}`}
+                              title="Editar título"
+                            >
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            </button>
+                          </div>
+                        )}
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full ${priorityConfig[task.priority].color}`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${priorityConfig[task.priority].dot}`} />
                             {task.priority === 'High' ? t.priorityHigh : task.priority === 'Medium' ? t.priorityMedium : t.priorityLow}
                           </span>
-                          <span className={`text-[11px] ${taskCat}`}>{task.category}</span>
+
                           {dates?.deadline && (
                             <span className={`text-[11px] font-medium ${dark ? 'text-violet-400' : 'text-violet-500'}`}>
                               🎯 {fmt(dates.deadline)}
@@ -529,15 +882,20 @@ export default function DashboardPage() {
                             { lbl: 'Criada em',    val: fmt(dates?.created ?? null),  dot: 'bg-slate-400' },
                             { lbl: 'Meta (prazo)', val: fmt(dates?.deadline ?? null), dot: 'bg-violet-500',
                               extra: (
-                                <div className="flex items-center gap-1 mt-1">
-                                  <input type="date" value={deadlineDraft[task.id] ?? ''}
-                                    onChange={e => setDeadlineDraft(prev => ({ ...prev, [task.id]: e.target.value }))}
-                                    className={inputDateCls} />
-                                  <button onClick={() => saveDeadline(task.id)}
-                                    className="text-[10px] px-2 py-0.5 rounded-md bg-violet-600 hover:bg-violet-500 text-white font-semibold transition">
-                                    ok
-                                  </button>
-                                </div>
+                                <button
+                                  onClick={() => {
+                                    if (dates?.deadline) {
+                                      setConfirmDeadlineId(task.id)
+                                      setDeadlineChangeStep('ask')
+                                    } else {
+                                      setEditingDeadlineId(task.id)
+                                      setDeadlineDraft(prev => ({ ...prev, [task.id]: '' }))
+                                    }
+                                  }}
+                                  className={`mt-1 flex items-center gap-1 text-[10px] font-medium ${dark ? 'text-violet-400/70 hover:text-violet-300' : 'text-violet-400 hover:text-violet-600'} transition`}>
+                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                  {dates?.deadline ? 'Alterar' : 'Definir'}
+                                </button>
                               )
                             },
                             { lbl: 'Iniciada em',  val: dates?.started  ? fmt(dates.started)  : isPending ? '— (não iniciada)' : '—', dot: 'bg-blue-400' },
@@ -553,6 +911,49 @@ export default function DashboardPage() {
                             </div>
                           ))}
                         </div>
+
+                        {/* definir prazo inline (apenas quando não há prazo) */}
+                        {editingDeadlineId === task.id && (
+                          <div className={`-mt-1 pt-3 border-t ${dark ? 'border-white/5' : 'border-slate-200'} flex flex-col gap-2`}>
+                            <div className="flex items-center gap-1.5">
+                              <span className={`w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0`} />
+                              <span className={`text-[10px] font-semibold uppercase tracking-widest ${timelineLbl}`}>Definir prazo</span>
+                            </div>
+                            <div className="pl-3 flex items-center gap-2">
+                              <input type="date"
+                                value={deadlineDraft[task.id] ?? ''}
+                                onChange={e => setDeadlineDraft(prev => ({ ...prev, [task.id]: e.target.value }))}
+                                className={inputDateCls} autoFocus />
+                              <button onClick={() => saveDeadline(task.id)}
+                                className="text-[10px] px-2 py-0.5 rounded-md bg-violet-600 hover:bg-violet-500 text-white font-semibold transition">ok</button>
+                              <button onClick={() => setEditingDeadlineId(null)}
+                                className={`text-[10px] px-1.5 py-0.5 rounded-md border ${dark ? 'border-white/10 text-white/40' : 'border-slate-200 text-slate-400'} transition`}>✕</button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* histórico de alterações de prazo */}
+                        {(deadlineHistory[task.id]?.length ?? 0) > 0 && (
+                          <div className={`pt-3 border-t ${dark ? 'border-white/5' : 'border-slate-200'} flex flex-col gap-2`}>
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
+                              <span className={`text-[10px] font-semibold uppercase tracking-widest ${timelineLbl}`}>Observações — alterações de prazo</span>
+                            </div>
+                            <div className="pl-3 flex flex-col gap-2">
+                              {deadlineHistory[task.id].map((entry, i) => (
+                                <div key={i} className={`rounded-lg px-3 py-2 ${dark ? 'bg-amber-500/5 border border-amber-500/15' : 'bg-amber-50 border border-amber-200'}`}>
+                                  <p className={`text-[10px] ${dark ? 'text-white/35' : 'text-slate-400'} mb-0.5`}>
+                                    Prazo inicial: <span className={`font-semibold ${dark ? 'text-white/55' : 'text-slate-500'}`}>{fmt(entry.oldDate)}</span>
+                                  </p>
+                                  <p className={`text-[10px] font-semibold ${dark ? 'text-amber-400' : 'text-amber-700'} mb-1`}>
+                                    Novo prazo: {fmt(entry.newDate)} <span className={`font-normal ${dark ? 'text-white/30' : 'text-slate-400'}`}>· {entry.changedAt}</span>
+                                  </p>
+                                  <p className={`text-[11px] ${dark ? 'text-white/60' : 'text-slate-600'}`}>{entry.reason}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
                         {/* stats de tempo */}
                         <div className={`flex gap-4 text-xs pt-1 border-t ${dark ? 'border-white/5' : 'border-slate-200'}`}>
@@ -588,7 +989,7 @@ export default function DashboardPage() {
                                   className={`text-xs px-3 py-1.5 rounded-lg border ${dark ? 'border-white/10 text-white/50 hover:bg-white/5' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} transition`}>
                                   Cancelar
                                 </button>
-                                <button onClick={() => saveDesc(task.id)}
+                                <button onClick={() => saveDescToBank(task.id)}
                                   className="text-xs px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-semibold transition">
                                   Salvar
                                 </button>
@@ -645,113 +1046,207 @@ export default function DashboardPage() {
           </div>
 
           {/* ── Gráfico de acompanhamento ── */}
-          <div className={`${cardBg} border rounded-2xl p-5`}>
-            <div className="flex items-start justify-between mb-4 flex-wrap gap-3">
+          <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
+            {/* cabeçalho */}
+            <div className={`px-5 pt-4 pb-3 flex items-center justify-between flex-wrap gap-3 border-b ${dark ? 'border-white/5' : 'border-slate-100'}`}>
               <div>
-                <p className={`text-xs font-bold ${sectionLbl} uppercase tracking-widest`}>Acompanhamento</p>
-                <p className={`text-[11px] ${textFaint} mt-0.5`}>Previsto × Concluídas × Em andamento</p>
+                <p className={`text-sm font-semibold ${text}`}>Progresso das Tarefas</p>
+                <p className={`text-xs ${textFaint} mt-0.5`}>Concluídas vs. previsto ao longo do tempo</p>
               </div>
-              {/* legenda */}
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-5">
                 {[
-                  { color: '#10b981', label: 'Concluídas',   dash: false },
-                  { color: '#3b82f6', label: 'Andamento',    dash: false },
-                  { color: dark ? 'rgba(255,255,255,.3)' : 'rgba(100,116,139,.5)', label: 'Previsto', dash: true },
+                  { color: '#10b981', label: 'Concluídas', dash: false },
+                  { color: '#6366f1', label: 'Em andamento', dash: false },
+                  { color: dark ? 'rgba(255,255,255,.35)' : 'rgba(100,116,139,.55)', label: 'Previsto', dash: true },
                 ].map(l => (
                   <div key={l.label} className="flex items-center gap-1.5">
-                    <svg width="20" height="10">
+                    <svg width="22" height="8" className="flex-shrink-0">
                       {l.dash
-                        ? <line x1="0" y1="5" x2="20" y2="5" stroke={l.color} strokeWidth="2" strokeDasharray="4 2" />
-                        : <line x1="0" y1="5" x2="20" y2="5" stroke={l.color} strokeWidth="2.5" strokeLinecap="round" />}
+                        ? <line x1="0" y1="4" x2="22" y2="4" stroke={l.color} strokeWidth="1.5" strokeDasharray="4 2.5" />
+                        : <line x1="0" y1="4" x2="22" y2="4" stroke={l.color} strokeWidth="2" strokeLinecap="round" />}
                     </svg>
-                    <span className={`text-[11px] ${textFaint}`}>{l.label}</span>
+                    <span className={`text-[11px] font-medium ${textFaint}`}>{l.label}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            <svg width="100%" viewBox={`0 0 ${GW} ${GH + 20}`} className="overflow-visible">
-              <defs>
-                <linearGradient id="gradDone" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.25" />
-                  <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
-                </linearGradient>
-                <linearGradient id="gradDev" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.15" />
-                  <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.03" />
-                </linearGradient>
-              </defs>
+            <div className="px-5 pt-5 pb-4">
+              <svg width="100%" viewBox={`0 0 ${GW} ${GH + 40}`} className="overflow-visible"
+                onMouseLeave={() => setChartHoverIdx(null)}>
+                <defs>
+                  <linearGradient id="gDone" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#10b981" stopOpacity="0.2" />
+                    <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+                  </linearGradient>
+                  <linearGradient id="gProgress" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#6366f1" stopOpacity="0.12" />
+                    <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+                  </linearGradient>
+                  <linearGradient id="gDev" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.13" />
+                    <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.02" />
+                  </linearGradient>
+                </defs>
 
-              {/* linhas de grade horizontais */}
-              {[0, 0.25, 0.5, 0.75, 1].map(f => {
-                const yg = gy(Math.round(f * gMax))
-                const val = Math.round(f * gMax)
-                return (
-                  <g key={f}>
-                    <line x1={GP} y1={yg} x2={GW - GP} y2={yg}
-                      stroke={dark ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.05)'} strokeWidth="1" />
-                    <text x={GP - 6} y={yg + 4} textAnchor="end" fontSize="9"
-                      fill={dark ? 'rgba(255,255,255,.3)' : '#94a3b8'}>{val}</text>
-                  </g>
-                )
-              })}
+                {/* linhas de grade horizontais + labels eixo Y */}
+                {[0, 0.25, 0.5, 0.75, 1].map((f, idx) => {
+                  const val = Math.round(f * gMax)
+                  const yg  = gy(Math.max(1, val === 0 ? 1 : val))
+                  return (
+                    <g key={idx}>
+                      <line x1={GP} y1={yg} x2={GW - GP / 2} y2={yg}
+                        stroke={dark ? 'rgba(255,255,255,.055)' : 'rgba(0,0,0,.06)'} strokeWidth="1" />
+                      <text x={GP - 8} y={yg + 4} textAnchor="end"
+                        fontSize="10" fontFamily="system-ui,sans-serif" fontWeight="500"
+                        fill={dark ? 'rgba(255,255,255,.28)' : '#94a3b8'}>{val}</text>
+                    </g>
+                  )
+                })}
 
-              {/* área de desvio (entre previsto e concluídas) */}
-              <path d={areaDeviation} fill="url(#gradDev)" />
+                {/* linhas de grade verticais em cada ponto */}
+                {chartLabels.map((_, i) => (
+                  <line key={i} x1={gx(i)} y1={GP} x2={gx(i)} y2={GH - GP}
+                    stroke={dark ? 'rgba(255,255,255,.035)' : 'rgba(0,0,0,.04)'} strokeWidth="1" />
+                ))}
 
-              {/* área sob concluídas */}
-              <path d={`${pathDone} L ${gx(nWeeks-1)} ${gy(0)} L ${gx(0)} ${gy(0)} Z`} fill="url(#gradDone)" />
+                {/* crosshair de hover */}
+                {chartHoverIdx !== null && (
+                  <line x1={gx(chartHoverIdx)} y1={GP - 4} x2={gx(chartHoverIdx)} y2={GH - GP}
+                    stroke={dark ? 'rgba(255,255,255,.18)' : 'rgba(0,0,0,.13)'}
+                    strokeWidth="1" strokeDasharray="3 2" />
+                )}
 
-              {/* linha previsto (tracejada) */}
-              <path d={pathPlanned} fill="none"
-                stroke={dark ? 'rgba(255,255,255,.3)' : 'rgba(100,116,139,.45)'}
-                strokeWidth="1.5" strokeDasharray="6 3" strokeLinecap="round" />
+                {/* baseline */}
+                <line x1={GP} y1={GH - GP} x2={GW - GP / 2} y2={GH - GP}
+                  stroke={dark ? 'rgba(255,255,255,.1)' : 'rgba(0,0,0,.1)'} strokeWidth="1" />
 
-              {/* linha andamento */}
-              <path d={pathProgress} fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                {/* área de desvio */}
+                <path d={areaDeviation} fill="url(#gDev)" />
 
-              {/* linha concluídas */}
-              <path d={pathDone} fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                {/* área sob concluídas */}
+                <path d={`${pathDone} L ${gx(nPoints-1)} ${GH - GP} L ${gx(0)} ${GH - GP} Z`} fill="url(#gDone)" />
 
-              {/* pontos concluídas */}
-              {doneSeries.map((v, i) => (
-                <g key={i}>
-                  <circle cx={gx(i)} cy={gy(v)} r="3.5" fill="#10b981" />
-                  <circle cx={gx(i)} cy={gy(v)} r="6" fill="#10b981" opacity="0.15" />
-                </g>
-              ))}
+                {/* área sob andamento */}
+                <path d={`${pathProgress} L ${gx(nPoints-1)} ${GH - GP} L ${gx(0)} ${GH - GP} Z`} fill="url(#gProgress)" />
 
-              {/* pontos andamento */}
-              {progressSeries.map((v, i) => (
-                <circle key={i} cx={gx(i)} cy={gy(v)} r="3" fill="#3b82f6" />
-              ))}
+                {/* linha previsto (tracejada) */}
+                <path d={pathPlanned} fill="none"
+                  stroke={dark ? 'rgba(255,255,255,.28)' : 'rgba(100,116,139,.4)'}
+                  strokeWidth="1.5" strokeDasharray="6 3" strokeLinecap="round" />
 
-              {/* eixo X — labels semanas */}
-              {weeks.map((w, i) => (
-                <text key={w} x={gx(i)} y={GH + 14} textAnchor="middle" fontSize="10"
-                  fill={dark ? 'rgba(255,255,255,.35)' : '#94a3b8'}>{w}</text>
-              ))}
-            </svg>
+                {/* linha andamento */}
+                <path d={pathProgress} fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
 
-            {/* insight automático */}
-            <div className={`mt-3 pt-3 border-t ${dark ? 'border-white/5' : 'border-slate-100'} flex items-center gap-2`}>
-              {(() => {
-                const lastDone    = doneSeries[doneSeries.length - 1]
-                const lastPlanned = plannedSeries[plannedSeries.length - 1]
-                const diff = lastDone - lastPlanned
-                if (diff >= 0) return (
-                  <>
-                    <span className="text-xs font-semibold text-emerald-500">✓ Adiantado</span>
-                    <span className={`text-xs ${textFaint}`}>{diff} tarefa{diff !== 1 ? 's' : ''} acima do previsto</span>
-                  </>
-                )
-                return (
-                  <>
-                    <span className="text-xs font-semibold text-amber-500">⚠ Atraso</span>
-                    <span className={`text-xs ${textFaint}`}>{Math.abs(diff)} tarefa{Math.abs(diff) !== 1 ? 's' : ''} abaixo do previsto</span>
-                  </>
-                )
-              })()}
+                {/* linha concluídas */}
+                <path d={pathDone} fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+
+                {/* pontos concluídas */}
+                {doneSeries.map((v, i) => {
+                  const cy = v > 0 ? gy(v) : GH - GP
+                  return (
+                    <g key={i}>
+                      <circle cx={gx(i)} cy={cy} r="8" fill="#10b981" opacity={chartHoverIdx === i ? 0.2 : 0.1} />
+                      <circle cx={gx(i)} cy={cy} r="3.5" fill="#10b981" />
+                      <circle cx={gx(i)} cy={cy} r="1.4" fill="white" opacity="0.85" />
+                    </g>
+                  )
+                })}
+
+                {/* pontos andamento */}
+                {progressSeries.map((v, i) => {
+                  const cy = v > 0 ? gy(v) : GH - GP
+                  return (
+                    <g key={i}>
+                      <circle cx={gx(i)} cy={cy} r="6.5" fill="#6366f1" opacity={chartHoverIdx === i ? 0.2 : 0.1} />
+                      <circle cx={gx(i)} cy={cy} r="3" fill="#6366f1" />
+                      <circle cx={gx(i)} cy={cy} r="1.2" fill="white" opacity="0.85" />
+                    </g>
+                  )
+                })}
+
+                {/* hit targets + labels eixo X */}
+                {chartLabels.map((lbl, i) => {
+                  const colW = nPoints > 1 ? (GW - GP * 2) / (nPoints - 1) : GW - GP * 2
+                  return (
+                    <g key={i}>
+                      <rect
+                        x={gx(i) - colW / 2} y={GP}
+                        width={colW} height={GH - GP * 2}
+                        fill="transparent"
+                        onMouseEnter={() => setChartHoverIdx(i)} />
+                      <text x={gx(i)} y={GH + 17} textAnchor="middle"
+                        fontSize="10" fontFamily="system-ui,sans-serif"
+                        fontWeight={chartHoverIdx === i ? '600' : '400'}
+                        fill={chartHoverIdx === i
+                          ? (dark ? 'rgba(255,255,255,.7)' : '#475569')
+                          : (dark ? 'rgba(255,255,255,.32)' : '#94a3b8')}>
+                        {lbl}
+                      </text>
+                    </g>
+                  )
+                })}
+
+                {/* tooltip */}
+                {chartHoverIdx !== null && (() => {
+                  const i = chartHoverIdx
+                  const tx = gx(i)
+                  const tw = 118; const th = 68
+                  const tx2 = tx + tw > GW - GP / 2 ? tx - tw - 10 : tx + 10
+                  const ty2 = GP
+                  const bg  = dark ? '#1a2030' : '#f8fafc'
+                  const bd  = dark ? 'rgba(255,255,255,.1)' : 'rgba(0,0,0,.08)'
+                  const lbl1 = dark ? 'rgba(255,255,255,.4)' : '#64748b'
+                  const lbl2 = dark ? 'rgba(255,255,255,.75)' : '#1e293b'
+                  return (
+                    <g style={{ pointerEvents: 'none' }}>
+                      <rect x={tx2} y={ty2} width={tw} height={th} rx="7"
+                        fill={bg} stroke={bd} strokeWidth="1" />
+                      <text x={tx2 + 10} y={ty2 + 14} fontSize="9.5"
+                        fontFamily="system-ui,sans-serif" fontWeight="600" fill={lbl1}>
+                        {chartLabels[i]}
+                      </text>
+                      <circle cx={tx2 + 11} cy={ty2 + 29} r="3.5" fill="#10b981" />
+                      <text x={tx2 + 20} y={ty2 + 33} fontSize="10"
+                        fontFamily="system-ui,sans-serif" fontWeight="500" fill={lbl2}>
+                        Concluídas: {doneSeries[i]}
+                      </text>
+                      <circle cx={tx2 + 11} cy={ty2 + 48} r="3.5" fill="#6366f1" />
+                      <text x={tx2 + 20} y={ty2 + 52} fontSize="10"
+                        fontFamily="system-ui,sans-serif" fontWeight="500" fill={lbl2}>
+                        Andamento: {progressSeries[i]}
+                      </text>
+                    </g>
+                  )
+                })()}
+              </svg>
+
+              {/* insight */}
+              <div className={`mt-1 pt-3 border-t ${dark ? 'border-white/5' : 'border-slate-100'}`}>
+                {(() => {
+                  const lastDone    = doneSeries[doneSeries.length - 1]
+                  const lastPlanned = plannedSeries[plannedSeries.length - 1]
+                  const diff = lastDone - lastPlanned
+                  if (diff >= 0) return (
+                    <div className="flex items-center gap-2.5">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${dark ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-emerald-50 border-emerald-200 text-emerald-600'}`}>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        Adiantado
+                      </span>
+                      <span className={`text-xs ${textFaint}`}>{diff} tarefa{diff !== 1 ? 's' : ''} acima do previsto</span>
+                    </div>
+                  )
+                  return (
+                    <div className="flex items-center gap-2.5">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${dark ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-amber-50 border-amber-200 text-amber-600'}`}>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+                        Abaixo do previsto
+                      </span>
+                      <span className={`text-xs ${textFaint}`}>{Math.abs(diff)} tarefa{Math.abs(diff) !== 1 ? 's' : ''} abaixo do esperado</span>
+                    </div>
+                  )
+                })()}
+              </div>
             </div>
           </div>
 
