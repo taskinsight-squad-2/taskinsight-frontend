@@ -53,8 +53,8 @@ export const authService = {
     });
 
     const json = await response.json();
-    if (json?.success === false) {
-      throw new Error(json.message || "Erro ao enviar email");
+    if (!response.ok) {
+      throw new Error(json?.message || "Erro ao enviar email");
     }
   },
 };
