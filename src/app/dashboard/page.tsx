@@ -25,10 +25,11 @@ interface AnalyticsResult {
 }
 
 interface TaskDates {
-  created:   string
-  started:   string | null
-  finished:  string | null
-  deadline:  string | null
+  created:          string
+  started:          string | null
+  finished:         string | null
+  deadline:         string | null
+  originalDeadline: string | null
 }
 
 function mapStatus(s: ApiTask['status']): Status {
@@ -53,6 +54,12 @@ function daysBetween(a: string | null, b: string | null) {
   if (!a || !b) return null
   const ms = new Date(b).getTime() - new Date(a).getTime()
   return Math.max(0, Math.round(ms / 86_400_000))
+}
+function slaInfo(originalDeadline: string | null, finished: string | null): { days: number; onTime: boolean } | null {
+  if (!originalDeadline || !finished) return null
+  const ms = new Date(finished).getTime() - new Date(originalDeadline).getTime()
+  const days = Math.round(Math.abs(ms) / 86_400_000)
+  return { days, onTime: ms <= 0 }
 }
 
 export default function DashboardPage() {
@@ -136,10 +143,11 @@ export default function DashboardPage() {
     if (apiTasks.length === 0) return
     setTaskStatuses(Object.fromEntries(apiTasks.map(t => [t._id, mapStatus(t.status)])))
     setTaskDates(Object.fromEntries(apiTasks.map(t => [t._id, {
-      created:  t.createdAt?.slice(0, 10) ?? today(),
-      started:  t.startedAt?.slice(0, 10) ?? null,
-      finished: t.completedAt?.slice(0, 10) ?? null,
-      deadline: t.dueDate?.slice(0, 10) ?? null,
+      created:          t.createdAt?.slice(0, 10) ?? today(),
+      started:          t.startedAt?.slice(0, 10) ?? null,
+      finished:         t.completedAt?.slice(0, 10) ?? null,
+      deadline:         t.dueDate?.slice(0, 10) ?? null,
+      originalDeadline: t.originalDueDate?.slice(0, 10) ?? null,
     }])))
     setDeadlineHistory(Object.fromEntries(
       apiTasks
@@ -929,6 +937,8 @@ export default function DashboardPage() {
                 const isRunning  = task.status === 'InProgress'
                 const isPending  = task.status === 'Pending'
                 const isDone     = task.status === 'Done'
+                const hasProrrog = dates?.originalDeadline && dates?.deadline && dates.originalDeadline !== dates.deadline
+                const sla        = slaInfo(dates?.originalDeadline ?? null, dates?.finished ?? null)
 
                 return (
                   <li key={task.id} className={`border-b last:border-b-0 ${listBdr}`} aria-label={`Tarefa: ${task.title}, status: ${statusConfig[task.status].label}, prioridade: ${task.priority === 'High' ? t.priorityHigh : task.priority === 'Medium' ? t.priorityMedium : t.priorityLow}`}>
@@ -1026,7 +1036,7 @@ export default function DashboardPage() {
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                           {[
                             { lbl: 'Criada em',    val: fmt(dates?.created ?? null),  dot: 'bg-slate-400' },
-                            { lbl: 'Meta (prazo)', val: fmt(dates?.deadline ?? null), dot: 'bg-violet-500',
+                            { lbl: hasProrrog ? 'Prazo atual' : 'Meta (prazo)', val: fmt(dates?.deadline ?? null), dot: 'bg-violet-500',
                               extra: (
                                 <button
                                   onClick={() => {
@@ -1059,6 +1069,16 @@ export default function DashboardPage() {
                             </div>
                           ))}
                         </div>
+
+                        {/* prazo original — exibido quando houve prorrogação */}
+                        {hasProrrog && (
+                          <div className={`-mt-1 pt-3 border-t ${dark ? 'border-white/5' : 'border-slate-200'} flex items-center gap-2`}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
+                            <span className={`text-[10px] font-semibold uppercase tracking-widest ${timelineLbl}`}>Prazo original:</span>
+                            <span className={`text-[11px] font-medium ${dark ? 'text-amber-300' : 'text-amber-600'}`}>{fmt(dates?.originalDeadline ?? null)}</span>
+                            <span className={`text-[10px] ${dark ? 'text-white/30' : 'text-slate-400'}`}>(prazo prorrogado)</span>
+                          </div>
+                        )}
 
                         {/* definir prazo inline (apenas quando não há prazo) */}
                         {editingDeadlineId === task.id && (
@@ -1104,7 +1124,7 @@ export default function DashboardPage() {
                         )}
 
                         {/* stats de tempo */}
-                        <div className={`flex gap-4 text-xs pt-1 border-t ${dark ? 'border-white/5' : 'border-slate-200'}`}>
+                        <div className={`flex flex-wrap gap-4 text-xs pt-1 border-t ${dark ? 'border-white/5' : 'border-slate-200'}`}>
                           {stalled !== null && (
                             <span className={textFaint}>
                               ⏸ Ficou parada <strong className={text}>{stalled}d</strong> antes de iniciar
@@ -1118,6 +1138,16 @@ export default function DashboardPage() {
                           {isDone && dates?.started && dates?.finished && (
                             <span className={textFaint}>
                               ✓ Concluída em <strong className={text}>{inProg}d</strong>
+                            </span>
+                          )}
+                          {/* SLA de resolução — baseado no prazo original, imune a prorrogações */}
+                          {sla !== null && isDone && (
+                            <span className={sla.onTime
+                              ? `font-medium ${dark ? 'text-emerald-400' : 'text-emerald-600'}`
+                              : `font-medium ${dark ? 'text-red-400' : 'text-red-600'}`}>
+                              {sla.onTime
+                                ? `SLA: dentro do prazo${sla.days > 0 ? ` (${sla.days}d de antecedência)` : ''}`
+                                : `SLA: ${sla.days}d após o prazo original`}
                             </span>
                           )}
                           {isPending && (

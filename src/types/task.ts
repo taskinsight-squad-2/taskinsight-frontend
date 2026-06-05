@@ -18,6 +18,7 @@ export interface Task {
   startedAt?: string | null;
   completedAt?: string | null;
   dueDate?: string | null;
+  originalDueDate?: string | null;
   deadlineHistory?: DeadlineHistoryEntry[];
   isDeleted?: boolean;
   deletedAt?: string | null;

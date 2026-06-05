@@ -69,6 +69,8 @@ export default function LoginPage() {
       return t.invalidCredentials
     if (msg.toLowerCase().includes('já cadastrado') || msg.toLowerCase().includes('already'))
       return t.emailAlreadyExists
+    if (msg.toLowerCase().includes('não cadastrado') || msg.toLowerCase().includes('not registered'))
+      return t.emailNotRegistered
     return fallback
   }
 
@@ -116,7 +118,7 @@ export default function LoginPage() {
       setSuccess(t.recoveryEmailSent)
       setForgotMode(false)
     }
-    catch (err: any) { setError(err.message || t.forgotError) }
+    catch (err: any) { setError(friendlyApiError(err.message ?? '', t.forgotError)) }
     finally { setLoading(false) }
   }
 
