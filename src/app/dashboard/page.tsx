@@ -69,6 +69,19 @@ export default function DashboardPage() {
   const [locale, setLocale] = useState<Locale>('pt')
   const t = translations[locale]
   const [dark, setDark]               = useState(false)
+
+  const [userName, setUserName] = useState('')
+  const [greeting, setGreeting] = useState('')
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('user')
+      if (stored) {
+        const u = JSON.parse(stored)
+        setUserName(u.name?.split(' ')[0] ?? '')
+      }
+    } catch {}
+    setGreeting(t.greeting(new Date().getHours()))
+  }, [t])
   const [filter, setFilter]           = useState<FilterTab>('All')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -608,7 +621,7 @@ export default function DashboardPage() {
         {!collapsed && (
           <>
             <div className="flex-1 min-w-0">
-              <p className={`text-sm font-semibold ${text} truncate`}>Hugo</p>
+              <p className={`text-sm font-semibold ${text} truncate`}>{userName || 'Usuário'}</p>
               <p className={`text-xs ${userPlan}`}>{t.freePlan}</p>
             </div>
             <button onClick={handleLogout} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 transition">
@@ -809,7 +822,7 @@ export default function DashboardPage() {
               <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
             <div>
-              <h1 className={`text-base font-bold ${text} tracking-tight`}>{t.goodMorning}, Hugo 👋</h1>
+              <h1 className={`text-base font-bold ${text} tracking-tight`}>{greeting}{userName ? `, ${userName}` : ''} 👋</h1>
               <p className="text-xs text-violet-500 mt-0.5">{t.pendingTasksMsg(nPending)}</p>
             </div>
           </div>
