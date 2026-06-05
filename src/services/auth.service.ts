@@ -41,4 +41,20 @@ export const authService = {
     }
     return json.data;
   },
+
+  forgotPassword: async (email: string): Promise<void> => {
+    if (!BASE_URL)
+      throw new Error("NEXT_PUBLIC_NODE_API_URL não está definido");
+
+    const response = await fetch(`${BASE_URL}/api/users/forgot-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+
+    const json = await response.json();
+    if (json?.success === false) {
+      throw new Error(json.message || "Erro ao enviar email");
+    }
+  },
 };

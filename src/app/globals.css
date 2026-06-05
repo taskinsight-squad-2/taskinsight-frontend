@@ -4,6 +4,7 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --focus-ring: #7c3aed;
 }
 
 @theme inline {
@@ -17,6 +18,63 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ── Skip link ──────────────────────────────────────────────────── */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 0;
+  z-index: 9999;
+  padding: 0.75rem 1.5rem;
+  background: #7c3aed;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 0 0 0.5rem 0;
+  text-decoration: none;
+  transition: top 0.1s;
+}
+.skip-link:focus {
+  top: 0;
+}
+
+/* ── Foco visível global ────────────────────────────────────────── */
+:focus-visible {
+  outline: 2.5px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Remove outline padrão quando não for teclado */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ── Redução de movimento ───────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Alto contraste (sistema) ───────────────────────────────────── */
+@media (prefers-contrast: more) {
+  :root {
+    --focus-ring: #000000;
+  }
+  button, a, input, select, textarea {
+    border-width: 2px !important;
+  }
+  :focus-visible {
+    outline-width: 3px;
+    outline-color: #000;
+  }
 }
 
 .glass {
@@ -47,3 +105,43 @@ body {
 
 .animate-float { animation: float 4s ease-in-out infinite; }
 .animate-pulse-ring { animation: pulse-ring 2.5s ease-in-out infinite; }
+
+/* ── Preferências de acessibilidade ────────────────────────────── */
+
+/* Fonte ampliada */
+.a11y-large-font { font-size: 112.5% !important; }
+.a11y-large-font * { line-height: 1.6 !important; }
+
+/* Reduzir animações (manual, além de prefers-reduced-motion) */
+.a11y-reduce-motion *,
+.a11y-reduce-motion *::before,
+.a11y-reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+/* Alto contraste manual */
+.a11y-high-contrast {
+  filter: contrast(1.25);
+}
+.a11y-high-contrast :focus-visible {
+  outline: 3px solid #fff !important;
+  outline-offset: 3px !important;
+}
+
+/* Modo foco — minimiza distrações */
+.a11y-focus-mode aside nav .a11y-decorative,
+.a11y-focus-mode .chart-section,
+.a11y-focus-mode .analytics-section {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* Alvos maiores */
+.a11y-larger-targets button,
+.a11y-larger-targets a,
+.a11y-larger-targets [role="button"] {
+  min-height: 44px !important;
+  min-width: 44px !important;
+}

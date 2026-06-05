@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { translations, type Locale } from '@/lib/i18n'
 import { taskService } from '@/services/task.service'
@@ -255,6 +256,10 @@ export default function DashboardPage() {
   const [newTaskForm, setNewTaskForm] = useState({ title: '', description: '', priority: 'MEDIUM' as ApiTask['priority'] })
   const [savingTask, setSavingTask]   = useState(false)
 
+  const trapNewTask  = useFocusTrap(showNewTask)
+  const trapDeadline = useFocusTrap(!!confirmDeadlineId)
+  const trapStart    = useFocusTrap(!!confirmStartId)
+
   async function handleCreateTask(e: React.FormEvent) {
     e.preventDefault()
     if (!newTaskForm.title.trim()) return
@@ -330,9 +335,9 @@ export default function DashboardPage() {
   const headerBg     = dark ? 'bg-[#080B14]/90' : 'bg-white/90'
   const headerBdr    = dark ? 'border-white/5'  : 'border-slate-200'
   const text         = dark ? 'text-white'       : 'text-slate-900'
-  const textMuted    = dark ? 'text-white/55'    : 'text-slate-500'
-  const textFaint    = dark ? 'text-white/40'    : 'text-slate-400'
-  const sectionLbl   = dark ? 'text-white/40'    : 'text-slate-400'
+  const textMuted    = dark ? 'text-white/70'    : 'text-slate-600'
+  const textFaint    = dark ? 'text-white/55'    : 'text-slate-500'
+  const sectionLbl   = dark ? 'text-white/55'    : 'text-slate-500'
   const navInact     = dark ? 'text-white/55 hover:text-white/80 hover:bg-white/5' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
   const navAct       = dark ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20' : 'bg-violet-50 text-violet-600 border border-violet-200'
   const catItem      = dark ? 'text-white/55 hover:text-white/75 hover:bg-white/5' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
@@ -360,10 +365,10 @@ export default function DashboardPage() {
   const inputDateCls = dark
     ? 'bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white outline-none focus:border-violet-500/60 transition'
     : 'bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-800 outline-none focus:border-violet-400 transition'
-  const timelineLbl  = dark ? 'text-white/35'   : 'text-slate-400'
-  const timelineVal  = dark ? 'text-white/75'   : 'text-slate-700'
-  const chevronCls   = dark ? 'text-white/30 hover:text-white/60' : 'text-slate-400 hover:text-slate-600'
-  const showDescCls  = dark ? 'text-white/40 hover:text-white/65' : 'text-slate-400 hover:text-slate-600'
+  const timelineLbl  = dark ? 'text-white/55'   : 'text-slate-500'
+  const timelineVal  = dark ? 'text-white/85'   : 'text-slate-700'
+  const chevronCls   = dark ? 'text-white/55 hover:text-white/80' : 'text-slate-500 hover:text-slate-700'
+  const showDescCls  = dark ? 'text-white/55 hover:text-white/80' : 'text-slate-500 hover:text-slate-700'
   const editBtnCls   = dark ? 'text-violet-400 hover:text-violet-300' : 'text-violet-500 hover:text-violet-700'
   const pagBtnBase   = `text-xs px-2.5 py-1 rounded-lg border transition font-medium`
   const pagBtnActive = dark ? 'bg-violet-600 border-violet-600 text-white' : 'bg-violet-600 border-violet-600 text-white'
@@ -513,6 +518,7 @@ export default function DashboardPage() {
 
   const sidebar = (
     <aside
+      aria-label="Menu lateral de navegação"
       className={`flex-shrink-0 ${sidebarBg} border-r ${sidebarBdr} flex flex-col h-full transition-all duration-300 overflow-hidden`}
       style={{ width: collapsed ? 60 : 256 }}
     >
@@ -526,8 +532,9 @@ export default function DashboardPage() {
         {!collapsed && <span className={`font-bold ${text} text-base tracking-tight flex-1`}>TaskFlow</span>}
         <button
           onClick={() => setSidebarCollapsed(v => !v)}
+          aria-label={collapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
+          aria-expanded={!collapsed}
           className={`w-7 h-7 flex items-center justify-center rounded-lg ${dark ? 'text-white/35 hover:bg-white/8 hover:text-white/70' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'} transition flex-shrink-0`}
-          title={collapsed ? 'Expandir menu' : 'Recolher menu'}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
             style={{ transform: collapsed ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .3s' }}>
@@ -537,7 +544,7 @@ export default function DashboardPage() {
       </div>
 
       {/* nav */}
-      <nav className="flex flex-col gap-0.5 px-2 py-4 flex-1 overflow-y-auto overflow-x-hidden">
+      <nav aria-label="Navegação principal" className="flex flex-col gap-0.5 px-2 py-4 flex-1 overflow-y-auto overflow-x-hidden">
         {!collapsed && <p className={`text-[10px] font-bold ${sectionLbl} uppercase tracking-[0.15em] px-3 mb-2`}>{t.menu}</p>}
         {navItems.map(item => (
           <button key={item.label}
@@ -556,15 +563,20 @@ export default function DashboardPage() {
 
         {!collapsed && (
           <>
-            <div className="flex items-center justify-between px-3 mt-6 mb-2">
+            <div className="flex items-center px-3 mt-6 mb-2">
               <p className={`text-[10px] font-bold ${sectionLbl} uppercase tracking-[0.15em]`}>{t.categories}</p>
-              {priorityFilter !== 'All' && (
-                <button onClick={() => setPriorityFilterReset('All')}
-                  className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${dark ? 'text-white/35 hover:text-white/60' : 'text-slate-400 hover:text-slate-600'} transition`}>
-                  limpar
-                </button>
-              )}
             </div>
+            <button
+              onClick={() => setPriorityFilterReset('All')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition ${priorityFilter === 'All' ? navAct : catItem}`}>
+              <span className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dark ? 'bg-white/30' : 'bg-slate-400'}`} />
+                Todas
+              </span>
+              <span className={`text-[11px] border rounded-full px-2 py-0.5 font-mono ${priorityFilter === 'All' ? (dark ? 'bg-violet-500/20 border-violet-500/30 text-violet-300' : 'bg-violet-100 border-violet-200 text-violet-600') : catBadge}`}>
+                {tasks.length}
+              </span>
+            </button>
             {categories.map(cat => {
               const isActive = priorityFilter === cat.priority
               return (
@@ -606,26 +618,26 @@ export default function DashboardPage() {
 
       {/* modal nova tarefa */}
       {showNewTask && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowNewTask(false)} />
-          <div className={`relative w-full max-w-md mx-4 ${dark ? 'bg-[#0D1117] border-white/10' : 'bg-white border-slate-200'} border rounded-2xl p-6 shadow-2xl`}>
-            <h2 className={`text-base font-bold ${dark ? 'text-white' : 'text-slate-900'} mb-5`}>Nova Tarefa</h2>
-            <form onSubmit={handleCreateTask} className="flex flex-col gap-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="modal-new-task-title">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowNewTask(false)} aria-hidden="true" />
+          <div ref={trapNewTask} className={`relative w-full max-w-md mx-4 ${dark ? 'bg-[#0D1117] border-white/10' : 'bg-white border-slate-200'} border rounded-2xl p-6 shadow-2xl`}>
+            <h2 id="modal-new-task-title" className={`text-base font-bold ${dark ? 'text-white' : 'text-slate-900'} mb-5`}>Nova Tarefa</h2>
+            <form onSubmit={handleCreateTask} className="flex flex-col gap-4" aria-label="Criar nova tarefa">
               <div>
-                <label className={`text-xs font-semibold ${dark ? 'text-white/65' : 'text-slate-600'} uppercase tracking-widest mb-1.5 block`}>Título</label>
-                <input required placeholder="Nome da tarefa" value={newTaskForm.title}
+                <label htmlFor="new-task-title" className={`text-xs font-semibold ${dark ? 'text-white/65' : 'text-slate-600'} uppercase tracking-widest mb-1.5 block`}>Título</label>
+                <input id="new-task-title" required placeholder="Nome da tarefa" value={newTaskForm.title}
                   onChange={e => setNewTaskForm(f => ({ ...f, title: e.target.value }))}
                   className={dark ? 'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-white/40 outline-none focus:border-violet-500/60 transition' : 'w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-violet-400 transition'} />
               </div>
               <div>
-                <label className={`text-xs font-semibold ${dark ? 'text-white/65' : 'text-slate-600'} uppercase tracking-widest mb-1.5 block`}>Descrição</label>
-                <textarea rows={3} placeholder="Descrição opcional" value={newTaskForm.description}
+                <label htmlFor="new-task-desc" className={`text-xs font-semibold ${dark ? 'text-white/65' : 'text-slate-600'} uppercase tracking-widest mb-1.5 block`}>Descrição</label>
+                <textarea id="new-task-desc" rows={3} placeholder="Descrição opcional" value={newTaskForm.description}
                   onChange={e => setNewTaskForm(f => ({ ...f, description: e.target.value }))}
                   className={dark ? 'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-white/40 outline-none focus:border-violet-500/60 resize-none transition' : 'w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-violet-400 resize-none transition'} />
               </div>
               <div>
-                <label className={`text-xs font-semibold ${dark ? 'text-white/65' : 'text-slate-600'} uppercase tracking-widest mb-1.5 block`}>Prioridade</label>
-                <select value={newTaskForm.priority} onChange={e => setNewTaskForm(f => ({ ...f, priority: e.target.value as ApiTask['priority'] }))}
+                <label htmlFor="new-task-priority" className={`text-xs font-semibold ${dark ? 'text-white/65' : 'text-slate-600'} uppercase tracking-widest mb-1.5 block`}>Prioridade</label>
+                <select id="new-task-priority" value={newTaskForm.priority} onChange={e => setNewTaskForm(f => ({ ...f, priority: e.target.value as ApiTask['priority'] }))}
                   className={dark ? 'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-violet-500/60 transition' : 'w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 outline-none focus:border-violet-400 transition'}>
                   <option value="HIGH">Alta</option>
                   <option value="MEDIUM">Média</option>
@@ -638,7 +650,8 @@ export default function DashboardPage() {
                   Cancelar
                 </button>
                 <button type="submit" disabled={savingTask}
-                  className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 transition disabled:opacity-50">
+                  className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 transition disabled:opacity-50"
+                  aria-busy={savingTask}>
                   {savingTask ? 'Salvando...' : 'Criar Tarefa'}
                 </button>
               </div>
@@ -654,15 +667,15 @@ export default function DashboardPage() {
         const newDate   = fmt(deadlineDraft[confirmDeadlineId] ?? null)
         const closeModal = () => { setConfirmDeadlineId(null); setDeadlineChangeStep(null); setDeadlineChangeReason(''); setDeadlineDraft(prev => ({ ...prev, [confirmDeadlineId]: '' })) }
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeModal} />
-            <div className={`relative w-full max-w-sm mx-4 ${dark ? 'bg-[#0D1117] border-white/10' : 'bg-white border-slate-200'} border rounded-2xl p-6 shadow-2xl`}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="modal-deadline-title">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeModal} aria-hidden="true" />
+            <div ref={trapDeadline} className={`relative w-full max-w-sm mx-4 ${dark ? 'bg-[#0D1117] border-white/10' : 'bg-white border-slate-200'} border rounded-2xl p-6 shadow-2xl`}>
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 flex-shrink-0">
+                <div aria-hidden="true" className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 flex-shrink-0">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                 </div>
                 <div>
-                  <p className={`text-sm font-bold ${dark ? 'text-white' : 'text-slate-900'}`}>
+                  <p id="modal-deadline-title" className={`text-sm font-bold ${dark ? 'text-white' : 'text-slate-900'}`}>
                     {deadlineChangeStep === 'ask' ? 'Deseja alterar o prazo?' : 'Informe a nova data e o motivo'}
                   </p>
                   <p className={`text-xs ${dark ? 'text-white/40' : 'text-slate-400'}`}>
@@ -729,15 +742,15 @@ export default function DashboardPage() {
         const priorityLabel = task?.priority === 'High' ? t.priorityHigh : task?.priority === 'Medium' ? t.priorityMedium : t.priorityLow
         const priorityColor = task?.priority === 'High' ? 'text-red-500' : task?.priority === 'Medium' ? 'text-amber-500' : 'text-emerald-500'
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setConfirmStartId(null)} />
-            <div className={`relative w-full max-w-sm mx-4 ${dark ? 'bg-[#0D1117] border-white/10' : 'bg-white border-slate-200'} border rounded-2xl p-6 shadow-2xl`}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="modal-start-title">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setConfirmStartId(null)} aria-hidden="true" />
+            <div ref={trapStart} className={`relative w-full max-w-sm mx-4 ${dark ? 'bg-[#0D1117] border-white/10' : 'bg-white border-slate-200'} border rounded-2xl p-6 shadow-2xl`}>
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500 flex-shrink-0">
+                <div aria-hidden="true" className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500 flex-shrink-0">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                 </div>
                 <div>
-                  <p className={`text-sm font-bold ${dark ? 'text-white' : 'text-slate-900'}`}>Iniciar tarefa agora?</p>
+                  <p id="modal-start-title" className={`text-sm font-bold ${dark ? 'text-white' : 'text-slate-900'}`}>Iniciar tarefa agora?</p>
                   <p className={`text-xs ${dark ? 'text-white/40' : 'text-slate-400'}`}>Prioridade: <span className={`font-semibold ${priorityColor}`}>{priorityLabel}</span></p>
                 </div>
               </div>
@@ -762,12 +775,14 @@ export default function DashboardPage() {
         )
       })()}
 
-      {/* toast */}
-      {toastMsg && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-amber-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg">
-          {toastMsg}
-        </div>
-      )}
+      {/* toast — aria-live anuncia para leitores de tela */}
+      <div role="status" aria-live="polite" aria-atomic="true" className="fixed top-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+        {toastMsg && (
+          <div className="bg-amber-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg pointer-events-auto">
+            {toastMsg}
+          </div>
+        )}
+      </div>
 
       <div className="hidden md:flex flex-col h-screen sticky top-0">{sidebar}</div>
       {sidebarOpen && (
@@ -777,13 +792,13 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <main className="flex-1 flex flex-col min-h-screen overflow-auto">
+      <main id="main-content" className="flex-1 flex flex-col min-h-screen overflow-auto" tabIndex={-1}>
 
         {/* Header */}
         <div className={`flex items-center justify-between px-6 py-4 border-b ${headerBdr} ${headerBg} backdrop-blur-xl sticky top-0 z-30 transition-colors duration-300`}>
           <div className="flex items-center gap-3">
-            <button onClick={() => setSidebarOpen(true)} className={`md:hidden ${mobileTrigger} transition`}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            <button onClick={() => setSidebarOpen(true)} aria-label="Abrir menu lateral" aria-expanded={sidebarOpen} className={`md:hidden ${mobileTrigger} transition`}>
+              <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
             <div>
               <h1 className={`text-base font-bold ${text} tracking-tight`}>{t.goodMorning}, Hugo 👋</h1>
@@ -798,11 +813,12 @@ export default function DashboardPage() {
               <option style={{ backgroundColor: dark ? '#0D1117' : 'white' }} value="en">EN</option>
             </select>
             <button onClick={() => setDark(v => !v)}
+              aria-label={dark ? 'Ativar modo claro' : 'Ativar modo escuro'}
               className={`w-8 h-8 flex items-center justify-center rounded-lg border ${ctrlBg} hover:opacity-80 transition text-sm`}>
-              {dark ? '☀️' : '🌙'}
+              <span aria-hidden="true">{dark ? '☀️' : '🌙'}</span>
             </button>
-            <button onClick={() => setShowNewTask(true)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-xs font-semibold hover:from-violet-500 hover:to-indigo-500 transition shadow-lg shadow-violet-500/25">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <button onClick={() => setShowNewTask(true)} aria-label="Criar nova tarefa" className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-xs font-semibold hover:from-violet-500 hover:to-indigo-500 transition shadow-lg shadow-violet-500/25">
+              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               {t.newTask}
             </button>
           </div>
@@ -810,8 +826,9 @@ export default function DashboardPage() {
 
         <div className="px-6 py-6 flex flex-col gap-5">
           {loadingTasks && (
-            <div className="flex items-center justify-center py-10">
-              <span className="w-6 h-6 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
+            <div role="status" aria-live="polite" className="flex items-center justify-center gap-3 py-10">
+              <span aria-hidden="true" className="w-6 h-6 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
+              <span className="text-sm text-violet-500">Carregando tarefas...</span>
             </div>
           )}
 
@@ -835,11 +852,18 @@ export default function DashboardPage() {
 
           {/* progress bar */}
           <div className={`${cardBg} border rounded-xl px-4 py-3 flex items-center gap-3`}>
-            <span className={`text-xs font-semibold ${textMuted} whitespace-nowrap`}>Conclusão</span>
-            <div className={`flex-1 h-1.5 ${progressBg} rounded-full overflow-hidden`}>
+            <span className={`text-xs font-semibold ${textMuted} whitespace-nowrap`} aria-hidden="true">Conclusão</span>
+            <div
+              role="progressbar"
+              aria-valuenow={completion}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`Progresso geral: ${completion}% concluído`}
+              className={`flex-1 h-1.5 ${progressBg} rounded-full overflow-hidden`}
+            >
               <div className="h-full rounded-full transition-all duration-700" style={{ width: `${completion}%`, background: 'linear-gradient(90deg,#7c3aed,#10b981)' }} />
             </div>
-            <span className={`text-xs font-bold ${text} tabular-nums w-8 text-right`}>{completion}%</span>
+            <span className={`text-xs font-bold ${text} tabular-nums w-8 text-right`} aria-hidden="true">{completion}%</span>
           </div>
 
           {/* ── Task list ── */}
@@ -880,14 +904,19 @@ export default function DashboardPage() {
             </div>
 
             {/* list */}
-            <div className="flex flex-col" style={{ maxHeight: 480, overflowY: 'auto' }}>
+            <ul
+              aria-label="Lista de tarefas"
+              aria-live="polite"
+              className="flex flex-col list-none m-0 p-0"
+              style={{ maxHeight: 480, overflowY: 'auto' }}
+            >
               {paginated.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-14 gap-3">
-                  <div className={`w-11 h-11 rounded-2xl ${emptyIcon} border flex items-center justify-center`}>
+                <li role="status" className="flex flex-col items-center justify-center py-14 gap-3">
+                  <div aria-hidden="true" className={`w-11 h-11 rounded-2xl ${emptyIcon} border flex items-center justify-center`}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
                   </div>
                   <p className={`text-sm ${textFaint}`}>{t.noTasks}</p>
-                </div>
+                </li>
               )}
               {paginated.map(task => {
                 const isExpanded = !!expanded[task.id]
@@ -902,7 +931,7 @@ export default function DashboardPage() {
                 const isDone     = task.status === 'Done'
 
                 return (
-                  <div key={task.id} className={`border-b last:border-b-0 ${listBdr}`}>
+                  <li key={task.id} className={`border-b last:border-b-0 ${listBdr}`} aria-label={`Tarefa: ${task.title}, status: ${statusConfig[task.status].label}, prioridade: ${task.priority === 'High' ? t.priorityHigh : task.priority === 'Medium' ? t.priorityMedium : t.priorityLow}`}>
                     <div className={`flex items-center gap-3 px-5 py-3.5 ${taskHover} transition group`}>
                       {/* status action button */}
                       <div className="flex-shrink-0">
@@ -1133,10 +1162,10 @@ export default function DashboardPage() {
                         </div>
                       </div>
                     )}
-                  </div>
+                  </li>
                 )
               })}
-            </div>
+            </ul>
 
             {/* paginação */}
             {filtered.length > pageSize && (
@@ -1194,14 +1223,14 @@ export default function DashboardPage() {
               {/* linha 2: navegação semana + filtro mês */}
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-2">
-                  <button onClick={prevWeek}
+                  <button onClick={prevWeek} aria-label="Semana anterior"
                     className={`w-6 h-6 flex items-center justify-center rounded-lg border ${dark ? 'border-white/10 text-white/45 hover:bg-white/8 hover:text-white/75' : 'border-slate-200 text-slate-400 hover:bg-slate-100 hover:text-slate-700'} transition`}>
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                    <svg aria-hidden="true" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
                   </button>
-                  <span className={`text-xs font-semibold ${text} min-w-[180px] text-center`}>{weekLabel}</span>
-                  <button onClick={nextWeek}
+                  <span aria-live="polite" aria-atomic="true" className={`text-xs font-semibold ${text} min-w-[180px] text-center`}>{weekLabel}</span>
+                  <button onClick={nextWeek} aria-label="Próxima semana"
                     className={`w-6 h-6 flex items-center justify-center rounded-lg border ${dark ? 'border-white/10 text-white/45 hover:bg-white/8 hover:text-white/75' : 'border-slate-200 text-slate-400 hover:bg-slate-100 hover:text-slate-700'} transition`}>
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                    <svg aria-hidden="true" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                   </button>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1227,9 +1256,40 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {/* Tabela de dados oculta visualmente — acessível para leitores de tela */}
+            <div className="sr-only">
+              <table>
+                <caption>Progresso semanal — {weekLabel}</caption>
+                <thead>
+                  <tr><th scope="col">Data</th><th scope="col">Previsto</th><th scope="col">Concluídas</th><th scope="col">Em andamento</th></tr>
+                </thead>
+                <tbody>
+                  {chartLabels.map((lbl, i) => (
+                    <tr key={i}>
+                      <th scope="row">{lbl}</th>
+                      <td>{plannedSeries[i]}</td>
+                      <td>{doneSeries[i]}</td>
+                      <td>{progressSeries[i]}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
             <div className="px-5 pt-5 pb-4">
-              <svg width="100%" viewBox={`0 0 ${GW} ${GH + 40}`} className="overflow-visible"
-                onMouseLeave={() => setChartHoverIdx(null)}>
+              <svg
+                width="100%"
+                viewBox={`0 0 ${GW} ${GH + 40}`}
+                className="overflow-visible"
+                role="img"
+                aria-labelledby="chart-title chart-desc"
+                onMouseLeave={() => setChartHoverIdx(null)}
+              >
+                <title id="chart-title">Gráfico de progresso — {weekLabel}</title>
+                <desc id="chart-desc">
+                  Linha de tarefas concluídas, em andamento e previsto por dia da semana.
+                  {doneSeries[doneSeries.length - 1]} concluídas e {progressSeries[progressSeries.length - 1]} em andamento no último dia visível.
+                </desc>
                 <defs>
                   <linearGradient id="gDone" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#10b981" stopOpacity="0.2" />
