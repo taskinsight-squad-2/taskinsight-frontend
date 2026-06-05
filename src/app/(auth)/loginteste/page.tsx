@@ -15,7 +15,7 @@ export default function LoginTestePage() {
     event.preventDefault();
     setError("");
     if (!email || !password) {
-      setError("Preencha e-mail e senha.");
+      setError("Preencha e-mail e senha!");
       return;
     }
 
