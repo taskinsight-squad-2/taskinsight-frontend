@@ -1,5 +1,6 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
 import { useState, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { translations, type Locale } from '@/lib/i18n'
