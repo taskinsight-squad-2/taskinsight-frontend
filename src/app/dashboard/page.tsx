@@ -170,7 +170,7 @@ export default function DashboardPage() {
   const [confirmDeadlineId, setConfirmDeadlineId] = useState<string | null>(null)
   const [deadlineChangeReason, setDeadlineChangeReason] = useState('')
   const [deadlineChangeStep, setDeadlineChangeStep] = useState<'ask' | 'edit' | null>(null)
-  const [deadlineHistory, setDeadlineHistory] = useState<Record<string, Array<{newDate: string, reason: string, changedAt: string}>>>({})
+  const [deadlineHistory, setDeadlineHistory] = useState<Record<string, Array<{oldDate: string | null, newDate: string, reason: string, changedAt: string}>>>({})
   const [editingTitle, setEditingTitle] = useState<Record<string, boolean>>({})
   const [draftTitle,   setDraftTitle]   = useState<Record<string, string>>({})
   const [toastMsg, setToastMsg]     = useState('')
@@ -402,7 +402,7 @@ export default function DashboardPage() {
     Done:       { color: 'bg-emerald-50 text-emerald-600 border border-emerald-200', label: 'Concluída' },
   }
 
-  const navItems: { label: string; icon: React.ReactNode; sort: SortMode }[] = [
+  const navItems: { label: string; icon: React.ReactNode; sort: SortMode; badge?: number }[] = [
     { label: t.dashboard, sort: 'default', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg> },
   ]
 
@@ -1615,7 +1615,7 @@ export default function DashboardPage() {
                           <CartesianGrid stroke={dark ? 'rgba(255,255,255,.06)' : '#e2e8f0'} />
                           <XAxis dataKey="date" stroke={dark ? 'rgba(255,255,255,.3)' : '#94a3b8'} tick={{ fontSize: 11, fill: dark ? 'rgba(255,255,255,.4)' : '#64748b' }} />
                           <YAxis stroke={dark ? 'rgba(255,255,255,.3)' : '#94a3b8'} tick={{ fontSize: 11, fill: dark ? 'rgba(255,255,255,.4)' : '#64748b' }} unit="%" />
-                          <Tooltip contentStyle={{ backgroundColor: dark ? '#1a2030' : '#fff', border: `1px solid ${dark ? 'rgba(255,255,255,.1)' : '#e2e8f0'}`, borderRadius: '8px', color: dark ? '#fff' : '#1e293b', fontSize: 12 }} formatter={(v: number) => `${v}%`} />
+                          <Tooltip contentStyle={{ backgroundColor: dark ? '#1a2030' : '#fff', border: `1px solid ${dark ? 'rgba(255,255,255,.1)' : '#e2e8f0'}`, borderRadius: '8px', color: dark ? '#fff' : '#1e293b', fontSize: 12 }} formatter={(v) => typeof v === 'number' ? `${v}%` : ''} />
                           <Line type="monotone" dataKey="slaPercentage" stroke="#f59e0b" strokeWidth={2} dot={{ fill: '#f59e0b', r: 3 }} name="SLA %" />
                           <Line type="monotone" dataKey="target" stroke={dark ? 'rgba(255,255,255,.3)' : '#94a3b8'} strokeWidth={1.5} strokeDasharray="5 3" dot={false} name="Meta" />
                         </LineChart>

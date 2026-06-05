@@ -76,7 +76,7 @@ export default function LoginPage() {
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault(); setError('')
-    const ok = validateEmail(loginForm.email) & validatePassword(loginForm.password) as unknown as boolean
+    const ok = validateEmail(loginForm.email) && validatePassword(loginForm.password)
     if (!ok) return
     setLoading(true)
     try {
