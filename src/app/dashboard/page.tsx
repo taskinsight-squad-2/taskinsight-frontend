@@ -9,6 +9,8 @@ import { taskService } from '@/services/task.service'
 import { analyticsApi } from '@/services/analytics.service'
 import type { Task as ApiTask } from '@/types/task'
 import type { MetricsByStatusResponse, MetricsByPriorityResponse, AverageTimeResponse, ThroughputResponse, BacklogResponse, ResponseTimeResponse } from '@/types/analytics'
+import { triggerVLibras } from '@/components/VLibras'
+import { useA11yPrefs } from '@/hooks/useA11yPrefs'
 
 type Priority = 'High' | 'Medium' | 'Low'
 type Status   = 'Pending' | 'InProgress' | 'Done'
@@ -68,7 +70,8 @@ export default function DashboardPage() {
   const isNew        = searchParams.get('new') === 'true'
   const [locale, setLocale] = useState<Locale>('pt')
   const t = translations[locale]
-  const [dark, setDark]               = useState(false)
+  const { prefs, set: setPrefs }      = useA11yPrefs()
+  const dark                          = prefs.darkMode
 
   const [userName, setUserName] = useState('')
   const [greeting, setGreeting] = useState('')
@@ -659,10 +662,11 @@ export default function DashboardPage() {
               <div>
                 <label htmlFor="new-task-priority" className={`text-xs font-semibold ${dark ? 'text-white/65' : 'text-slate-600'} uppercase tracking-widest mb-1.5 block`}>Prioridade</label>
                 <select id="new-task-priority" value={newTaskForm.priority} onChange={e => setNewTaskForm(f => ({ ...f, priority: e.target.value as ApiTask['priority'] }))}
-                  className={dark ? 'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-violet-500/60 transition' : 'w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 outline-none focus:border-violet-400 transition'}>
-                  <option value="HIGH">Alta</option>
-                  <option value="MEDIUM">Média</option>
-                  <option value="LOW">Baixa</option>
+                  style={{ backgroundColor: dark ? '#0D1117' : undefined }}
+                  className={dark ? 'w-full bg-[#0D1117] border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-violet-500/60 transition' : 'w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 outline-none focus:border-violet-400 transition'}>
+                  <option value="HIGH" style={{ backgroundColor: dark ? '#0D1117' : 'white' }}>Alta</option>
+                  <option value="MEDIUM" style={{ backgroundColor: dark ? '#0D1117' : 'white' }}>Média</option>
+                  <option value="LOW" style={{ backgroundColor: dark ? '#0D1117' : 'white' }}>Baixa</option>
                 </select>
               </div>
               <div className="flex gap-2 justify-end mt-1">
@@ -827,13 +831,25 @@ export default function DashboardPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={triggerVLibras}
+              aria-label="VLibras — Intérprete de Libras"
+              title="VLibras"
+              className="h-8 px-2.5 flex items-center gap-1.5 rounded-lg hover:opacity-90 active:scale-95 transition-all"
+              style={{ backgroundColor: '#1351B4' }}
+            >
+              <svg aria-hidden="true" width="15" height="15" viewBox="0 0 64 64" fill="white">
+                <path d="M48 6c0-2.2-1.8-4-4-4s-4 1.8-4 4v20h-2V4c0-2.2-1.8-4-4-4s-4 1.8-4 4v22h-2V8c0-2.2-1.8-4-4-4S26 5.8 26 8v24h-2v-14c0-2.2-1.8-4-4-4s-4 1.8-4 4v18c0 14.4 9.6 22 24 22s22-8 22-22V18c0-2.2-1.8-4-4-4s-4 1.8-4 4v-12z"/>
+              </svg>
+              <span className="text-white text-[11px] font-bold tracking-wide">VLibras</span>
+            </button>
             <select value={locale} onChange={e => setLocale(e.target.value as Locale)}
               style={{ backgroundColor: dark ? '#0D1117' : undefined }}
               className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border ${ctrlBg} outline-none cursor-pointer hover:opacity-80 transition`}>
               <option style={{ backgroundColor: dark ? '#0D1117' : 'white' }} value="pt">PT-BR</option>
               <option style={{ backgroundColor: dark ? '#0D1117' : 'white' }} value="en">EN</option>
             </select>
-            <button onClick={() => setDark(v => !v)}
+            <button onClick={() => setPrefs('darkMode', !dark)}
               aria-label={dark ? 'Ativar modo claro' : 'Ativar modo escuro'}
               className={`w-8 h-8 flex items-center justify-center rounded-lg border ${ctrlBg} hover:opacity-80 transition text-sm`}>
               <span aria-hidden="true">{dark ? '☀️' : '🌙'}</span>
@@ -975,7 +991,7 @@ export default function DashboardPage() {
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        {editingTitle[task.id] ? (
+                        {editingTitle[task.id] && !isDone ? (
                           <div className="flex items-center gap-1.5">
                             <input
                               autoFocus
@@ -992,13 +1008,15 @@ export default function DashboardPage() {
                         ) : (
                           <div className="flex items-center gap-1.5 group/title">
                             <p className={`text-sm font-medium truncate transition ${isDone ? taskDoneCls : taskActiveCls}`}>{task.title}</p>
-                            <button
-                              onClick={() => startEditTitle(task.id, task.title)}
-                              className={`opacity-0 group-hover/title:opacity-100 transition ${ dark ? 'text-white/30 hover:text-white/60' : 'text-slate-300 hover:text-slate-500'}`}
-                              title="Editar título"
-                            >
-                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                            </button>
+                            {!isDone && (
+                              <button
+                                onClick={() => startEditTitle(task.id, task.title)}
+                                className={`opacity-0 group-hover/title:opacity-100 transition ${ dark ? 'text-white/30 hover:text-white/60' : 'text-slate-300 hover:text-slate-500'}`}
+                                title="Editar título"
+                              >
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                              </button>
+                            )}
                           </div>
                         )}
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -1021,7 +1039,7 @@ export default function DashboardPage() {
                         </span>
                         {/* chevron accordion */}
                         {!savedDesc ? (
-                          <button onClick={() => { toggleExpand(task.id); if (!isExpanded) startEdit(task.id) }}
+                          <button onClick={() => { toggleExpand(task.id); if (!isExpanded && !isDone) startEdit(task.id) }}
                             className={`${chevronCls} transition`} title="Detalhes">
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
                               style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .2s' }}>
@@ -1170,7 +1188,7 @@ export default function DashboardPage() {
 
                         {/* descrição */}
                         <div className={`pt-1 border-t ${dark ? 'border-white/5' : 'border-slate-200'}`}>
-                          {isEditing ? (
+                          {isEditing && !isDone ? (
                             <>
                               <textarea rows={3} placeholder="Adicione uma descrição para esta tarefa..."
                                 value={draft} onChange={e => setDraftDesc(prev => ({ ...prev, [task.id]: e.target.value }))}
@@ -1189,18 +1207,22 @@ export default function DashboardPage() {
                           ) : savedDesc ? (
                             <>
                               <p className={`text-sm leading-relaxed ${descTextCls}`}>{savedDesc}</p>
-                              <button onClick={() => startEdit(task.id)}
-                                className={`mt-2 text-xs font-medium ${editBtnCls} flex items-center gap-1 transition`}>
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                                Editar descrição
-                              </button>
+                              {!isDone && (
+                                <button onClick={() => startEdit(task.id)}
+                                  className={`mt-2 text-xs font-medium ${editBtnCls} flex items-center gap-1 transition`}>
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                  Editar descrição
+                                </button>
+                              )}
                             </>
-                          ) : (
+                          ) : !isDone ? (
                             <button onClick={() => startEdit(task.id)}
                               className={`text-xs font-medium ${editBtnCls} flex items-center gap-1 transition`}>
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                               Adicionar descrição
                             </button>
+                          ) : (
+                            <p className={`text-xs italic ${dark ? 'text-white/25' : 'text-slate-300'}`}>Sem descrição</p>
                           )}
                         </div>
                       </div>
@@ -1302,7 +1324,7 @@ export default function DashboardPage() {
             {/* Tabela de dados oculta visualmente — acessível para leitores de tela */}
             <div className="sr-only">
               <table>
-                <caption>Progresso semanal — {weekLabel}</caption>
+                <caption suppressHydrationWarning>Progresso semanal — {weekLabel}</caption>
                 <thead>
                   <tr><th scope="col">Data</th><th scope="col">Previsto</th><th scope="col">Concluídas</th><th scope="col">Em andamento</th></tr>
                 </thead>
@@ -1328,8 +1350,8 @@ export default function DashboardPage() {
                 aria-labelledby="chart-title chart-desc"
                 onMouseLeave={() => setChartHoverIdx(null)}
               >
-                <title id="chart-title">Gráfico de progresso — {weekLabel}</title>
-                <desc id="chart-desc">
+                <title id="chart-title" suppressHydrationWarning>Gráfico de progresso — {weekLabel}</title>
+                <desc id="chart-desc" suppressHydrationWarning>
                   Linha de tarefas concluídas, em andamento e previsto por dia da semana.
                   {doneSeries[doneSeries.length - 1]} concluídas e {progressSeries[progressSeries.length - 1]} em andamento no último dia visível.
                 </desc>

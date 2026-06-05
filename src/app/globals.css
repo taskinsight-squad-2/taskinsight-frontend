@@ -145,3 +145,49 @@ body {
   min-height: 44px !important;
   min-width: 44px !important;
 }
+
+/* Otimizado para leitor de tela */
+.a11y-screen-reader :focus-visible {
+  outline: 3px solid var(--focus-ring) !important;
+  outline-offset: 3px !important;
+}
+
+/* Torna dicas sr-only visíveis como texto auxiliar pequeno */
+.a11y-screen-reader .sr-only {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  padding: 0 0.2rem !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  clip: auto !important;
+  white-space: normal !important;
+  display: inline-block !important;
+  font-size: 0.6rem !important;
+  opacity: 0.6;
+  vertical-align: middle;
+}
+
+/* Botões com aria-label exibem tooltip sempre visível */
+.a11y-screen-reader button[aria-label]::after,
+.a11y-screen-reader a[aria-label]::after {
+  content: attr(aria-label);
+  display: block;
+  font-size: 0.55rem;
+  opacity: 0.55;
+  line-height: 1.2;
+  text-align: center;
+  pointer-events: none;
+  overflow: hidden;
+  max-width: 6rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Remove animações que confundem leitores de tela */
+.a11y-screen-reader *,
+.a11y-screen-reader *::before,
+.a11y-screen-reader *::after {
+  animation-duration: 0.01ms !important;
+  transition-duration: 0.01ms !important;
+}

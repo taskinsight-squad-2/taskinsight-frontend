@@ -42,6 +42,17 @@ export const authService = {
     return json.data;
   },
 
+  confirmEmail: async (token: string): Promise<void> => {
+    if (!BASE_URL)
+      throw new Error("NEXT_PUBLIC_NODE_API_URL não está definido");
+
+    const response = await fetch(`${BASE_URL}/api/users/confirm-email?token=${encodeURIComponent(token)}`);
+    const json = await response.json();
+    if (!response.ok) {
+      throw new Error(json?.message || "Erro ao confirmar email");
+    }
+  },
+
   forgotPassword: async (email: string): Promise<void> => {
     if (!BASE_URL)
       throw new Error("NEXT_PUBLIC_NODE_API_URL não está definido");

@@ -6,6 +6,15 @@ import { translations, type Locale } from '@/lib/i18n'
 import { authService } from '@/services/auth.service'
 import { useA11yPrefs } from '@/hooks/useA11yPrefs'
 
+function speak(text: string) {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return
+  window.speechSynthesis.cancel()
+  const u = new SpeechSynthesisUtterance(text)
+  u.lang = 'pt-BR'
+  u.rate = 0.9
+  window.speechSynthesis.speak(u)
+}
+
 export default function LoginPage() {
   const router = useRouter()
   const [locale, setLocale] = useState<Locale>('pt')
@@ -24,6 +33,7 @@ export default function LoginPage() {
     if (announceTimer.current) clearTimeout(announceTimer.current)
     setA11yAnnounce(`${label}: ${next ? 'ativado' : 'desativado'}`)
     announceTimer.current = setTimeout(() => setA11yAnnounce(''), 2000)
+    if (prefs.speechMode || key === 'speechMode') speak(`${label} ${next ? 'ativado' : 'desativado'}`)
   }
   const [tab, setTab] = useState<'signin' | 'register'>('signin')
   const [showPassword, setShowPassword] = useState(false)
@@ -37,6 +47,9 @@ export default function LoginPage() {
   const [registerForm, setRegisterForm] = useState({ name: '', email: '', password: '', confirm: '' })
   const [forgotEmail, setForgotEmail] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+
+  useEffect(() => { if (prefs.speechMode && error) speak(error) }, [error, prefs.speechMode])
+  useEffect(() => { if (prefs.speechMode && success) speak(success) }, [success, prefs.speechMode])
 
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -100,10 +113,10 @@ export default function LoginPage() {
     if (!ok) return
     setLoading(true)
     try {
-      const data = await authService.register(registerForm.name, registerForm.email, registerForm.password)
-      localStorage.setItem('token', data.token)
-      localStorage.setItem('user', JSON.stringify(data.user))
-      router.push('/dashboard?new=true')
+      await authService.register(registerForm.name, registerForm.email, registerForm.password)
+      setRegisterForm({ name: '', email: '', password: '', confirm: '' })
+      switchTab('signin')
+      setSuccess(t.registerSuccess)
     }
     catch (err: any) { setError(friendlyApiError(err.message ?? '', t.registerError)) }
     finally { setLoading(false) }
@@ -118,7 +131,18 @@ export default function LoginPage() {
       setSuccess(t.recoveryEmailSent)
       setForgotMode(false)
     }
-    catch (err: any) { setError(friendlyApiError(err.message ?? '', t.forgotError)) }
+    catch (err: any) {
+      const msg = err.message ?? ''
+      const isNotRegistered = msg.toLowerCase().includes('não cadastrado') || msg.toLowerCase().includes('not registered')
+      if (isNotRegistered) {
+        setRegisterForm(f => ({ ...f, email: forgotEmail }))
+        setForgotMode(false)
+        setTab('register')
+        setSuccess(t.redirectedToRegister)
+      } else {
+        setError(friendlyApiError(msg, t.forgotError))
+      }
+    }
     finally { setLoading(false) }
   }
 
@@ -536,7 +560,7 @@ export default function LoginPage() {
                       </fieldset>
 
                       {/* Cognição / Foco */}
-                      <fieldset>
+                      <fieldset className="mb-3">
                         <legend className={`text-[10px] font-bold uppercase tracking-widest ${dark ? 'text-white/55' : 'text-slate-500'} mb-2`}>Cognição / Foco</legend>
                         <div className="flex flex-col gap-1.5">
                           {([
@@ -550,6 +574,22 @@ export default function LoginPage() {
                               {label}
                             </label>
                           ))}
+                        </div>
+                      </fieldset>
+
+                      {/* Comunicação */}
+                      <fieldset>
+                        <legend className={`text-[10px] font-bold uppercase tracking-widest ${dark ? 'text-white/55' : 'text-slate-500'} mb-2`}>Comunicação</legend>
+                        <div className="flex flex-col gap-2">
+                          <label className={`flex items-center gap-2.5 text-xs cursor-pointer ${dark ? 'text-white/80' : 'text-slate-700'}`}>
+                            <input type="checkbox" checked={prefs.speechMode}
+                              onChange={() => togglePref('speechMode', 'Leitura em voz alta')}
+                              className="w-3.5 h-3.5 rounded accent-violet-600 cursor-pointer" />
+                            <span className="flex items-center gap-1.5">
+                              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                              Leitura em voz alta (áudio)
+                            </span>
+                          </label>
                         </div>
                       </fieldset>
                     </div>

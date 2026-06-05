@@ -10,6 +10,7 @@ export interface A11yPrefs {
   largerTargets:     boolean
   simplifiedUI:      boolean
   focusMode:         boolean
+  speechMode:        boolean
 }
 
 const DEFAULTS: A11yPrefs = {
@@ -22,6 +23,7 @@ const DEFAULTS: A11yPrefs = {
   largerTargets:    false,
   simplifiedUI:     false,
   focusMode:        false,
+  speechMode:       false,
 }
 
 const KEY = 'a11y_prefs'
@@ -45,11 +47,12 @@ export function useA11yPrefs() {
 
   useEffect(() => {
     const root = document.documentElement
-    root.classList.toggle('a11y-high-contrast', prefs.highContrast)
-    root.classList.toggle('a11y-large-font',    prefs.largeFont)
-    root.classList.toggle('a11y-reduce-motion', prefs.reduceMotion)
-    root.classList.toggle('a11y-focus-mode',    prefs.focusMode)
-    root.classList.toggle('a11y-larger-targets', prefs.largerTargets)
+    root.classList.toggle('a11y-high-contrast',    prefs.highContrast)
+    root.classList.toggle('a11y-large-font',       prefs.largeFont)
+    root.classList.toggle('a11y-reduce-motion',    prefs.reduceMotion)
+    root.classList.toggle('a11y-focus-mode',       prefs.focusMode)
+    root.classList.toggle('a11y-larger-targets',   prefs.largerTargets)
+    root.classList.toggle('a11y-screen-reader',    prefs.screenReaderMode)
     localStorage.setItem(KEY, JSON.stringify(prefs))
   }, [prefs])
 
