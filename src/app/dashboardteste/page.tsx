@@ -699,4 +699,8 @@ export default function DashboardTestePage() {
       </div>
     </div>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> hugo-frontend

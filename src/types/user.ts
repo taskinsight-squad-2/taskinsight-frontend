@@ -9,4 +9,8 @@ export interface User {
   deletedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> hugo-frontend

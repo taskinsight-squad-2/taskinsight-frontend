@@ -40,5 +40,35 @@ export const authService = {
       throw new Error(json.message || json.error || "Erro de cadastro");
     }
     return json.data;
+<<<<<<< HEAD
+=======
+  },
+
+  confirmEmail: async (token: string): Promise<void> => {
+    if (!BASE_URL)
+      throw new Error("NEXT_PUBLIC_NODE_API_URL não está definido");
+
+    const response = await fetch(`${BASE_URL}/api/users/confirm-email?token=${encodeURIComponent(token)}`);
+    const json = await response.json();
+    if (!response.ok) {
+      throw new Error(json?.message || "Erro ao confirmar email");
+    }
+  },
+
+  forgotPassword: async (email: string): Promise<void> => {
+    if (!BASE_URL)
+      throw new Error("NEXT_PUBLIC_NODE_API_URL não está definido");
+
+    const response = await fetch(`${BASE_URL}/api/users/forgot-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+
+    const json = await response.json();
+    if (!response.ok) {
+      throw new Error(json?.message || "Erro ao enviar email");
+    }
+>>>>>>> hugo-frontend
   },
 };

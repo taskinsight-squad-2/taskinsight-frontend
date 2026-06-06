@@ -130,4 +130,8 @@ export default function RegisterTestePage() {
       </div>
     </div>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> hugo-frontend
