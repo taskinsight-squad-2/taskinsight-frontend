@@ -7,10 +7,12 @@ import {
   ResponseTimeResponse,
 } from "@/types/analytics";
 
-const BASE_URL = process.env.NEXT_PUBLIC_ANALYTICS_API_URL;
+const BASE_URL = process.env.NEXT_PUBLIC_ANALYTICS_API_URL ?? "";
 
 if (!BASE_URL) {
-  throw new Error("NEXT_PUBLIC_ANALYTICS_API_URL não está definida");
+  console.warn(
+    "NEXT_PUBLIC_ANALYTICS_API_URL não está definida. Analytics desabilitado.",
+  );
 }
 
 async function fetchMetrics<T>(endpoint: string, token?: string): Promise<T> {

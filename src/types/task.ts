@@ -1,6 +1,13 @@
 export type TaskStatus = "PENDING" | "IN_PROGRESS" | "DONE" | "CANCELLED";
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH";
 
+export interface DeadlineHistoryEntry {
+  oldDate: string | null;
+  newDate: string;
+  reason: string;
+  changedAt: string;
+}
+
 export interface Task {
   _id: string;
   title: string;
@@ -11,6 +18,8 @@ export interface Task {
   startedAt?: string | null;
   completedAt?: string | null;
   dueDate?: string | null;
+  originalDueDate?: string | null;
+  deadlineHistory?: DeadlineHistoryEntry[];
   isDeleted?: boolean;
   deletedAt?: string | null;
   createdAt?: string;
@@ -30,4 +39,5 @@ export interface UpdateTask {
   status?: TaskStatus;
   priority?: TaskPriority;
   dueDate?: string;
+  deadlineChangeReason?: string;
 }
