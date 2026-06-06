@@ -74,6 +74,7 @@ export default function DashboardPage() {
   const dark                          = prefs.darkMode
 
   const [userName, setUserName] = useState('')
+  const [userRole, setUserRole] = useState<'user' | 'admin'>('user')
   const [greeting, setGreeting] = useState('')
   useEffect(() => {
     try {
@@ -81,6 +82,7 @@ export default function DashboardPage() {
       if (stored) {
         const u = JSON.parse(stored)
         setUserName(u.name?.split(' ')[0] ?? '')
+        setUserRole(u.role ?? 'user')
       }
     } catch {}
     setGreeting(t.greeting(new Date().getHours()))
@@ -433,12 +435,18 @@ export default function DashboardPage() {
   // ── semanas do gráfico ─────────────────────────────────────────
   const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
-  const [chartMonth, setChartMonth] = useState<{ year: number; month: number }>(() => {
-    const n = new Date(); return { year: n.getFullYear(), month: n.getMonth() }
-  })
-  const [chartWeek, setChartWeek] = useState<number>(() => Math.ceil(new Date().getDate() / 7))
+  const [chartMonth, setChartMonth] = useState<{ year: number; month: number }>({ year: 0, month: 0 })
+  const [chartWeek, setChartWeek] = useState<number>(0)
+
+  // Initialise chart date on client only — avoids server/client new Date() mismatch
+  useEffect(() => {
+    const n = new Date()
+    setChartMonth({ year: n.getFullYear(), month: n.getMonth() })
+    setChartWeek(Math.ceil(n.getDate() / 7))
+  }, [])
 
   function getWeekDates(year: number, month: number, week: number): string[] {
+    if (week <= 0 || year <= 0) return []
     const lastDay = new Date(year, month + 1, 0).getDate()
     const start = (week - 1) * 7 + 1
     const end   = Math.min(week * 7, lastDay)
@@ -854,6 +862,18 @@ export default function DashboardPage() {
               className={`w-8 h-8 flex items-center justify-center rounded-lg border ${ctrlBg} hover:opacity-80 transition text-sm`}>
               <span aria-hidden="true">{dark ? '☀️' : '🌙'}</span>
             </button>
+            {userRole === 'admin' && (
+              <button
+                onClick={() => router.push('/dashboard/admin')}
+                aria-label="Acessar painel administrativo"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-violet-500/30 bg-violet-500/10 text-violet-400 text-xs font-semibold hover:bg-violet-500/20 transition"
+              >
+                <svg aria-hidden width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                Admin
+              </button>
+            )}
             <button onClick={() => setShowNewTask(true)} aria-label="Criar nova tarefa" className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-xs font-semibold hover:from-violet-500 hover:to-indigo-500 transition shadow-lg shadow-violet-500/25">
               <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               {t.newTask}
