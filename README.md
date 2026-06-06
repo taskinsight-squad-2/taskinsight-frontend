@@ -140,8 +140,4 @@ O projeto inclui suporte a múltiplos idiomas via `src/lib/i18n.ts`. Adicione tr
 - [Tailwind CSS](https://tailwindcss.com/docs) - Guia de estilização
 - [TypeScript Handbook](https://www.typescriptlang.org/docs/) - Tipagem em TypeScript
 
-<<<<<<< HEAD
 **Última atualização**: Junho de 2026 | **Versão**: 0.1.0 (desenvolvimento)
-=======
-**Última atualização**: Junho de 2026 | **Versão**: 0.1.0 (desenvolvimento)
->>>>>>> hugo-frontend

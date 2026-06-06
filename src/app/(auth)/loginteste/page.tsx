@@ -15,11 +15,7 @@ export default function LoginTestePage() {
     event.preventDefault();
     setError("");
     if (!email || !password) {
-<<<<<<< HEAD
-      setError("Preencha e-mail e senha!");
-=======
       setError("Preencha e-mail e senha.");
->>>>>>> hugo-frontend
       return;
     }
 
@@ -98,8 +94,4 @@ export default function LoginTestePage() {
       </div>
     </div>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> hugo-frontend

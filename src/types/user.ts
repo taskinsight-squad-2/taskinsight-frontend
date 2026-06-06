@@ -1,4 +1,4 @@
-export type UserRole = 'user' | 'admin';
+export type UserRole = "user" | "admin";
 
 export interface User {
   id: string;
@@ -9,8 +9,4 @@ export interface User {
   deletedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> hugo-frontend

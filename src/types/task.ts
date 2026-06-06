@@ -1,8 +1,6 @@
 export type TaskStatus = "PENDING" | "IN_PROGRESS" | "DONE" | "CANCELLED";
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH";
 
-<<<<<<< HEAD
-=======
 export interface DeadlineHistoryEntry {
   oldDate: string | null;
   newDate: string;
@@ -10,7 +8,6 @@ export interface DeadlineHistoryEntry {
   changedAt: string;
 }
 
->>>>>>> hugo-frontend
 export interface Task {
   _id: string;
   title: string;
@@ -21,11 +18,8 @@ export interface Task {
   startedAt?: string | null;
   completedAt?: string | null;
   dueDate?: string | null;
-<<<<<<< HEAD
-=======
   originalDueDate?: string | null;
   deadlineHistory?: DeadlineHistoryEntry[];
->>>>>>> hugo-frontend
   isDeleted?: boolean;
   deletedAt?: string | null;
   createdAt?: string;
@@ -45,9 +39,5 @@ export interface UpdateTask {
   status?: TaskStatus;
   priority?: TaskPriority;
   dueDate?: string;
-<<<<<<< HEAD
-}
-=======
   deadlineChangeReason?: string;
 }
->>>>>>> hugo-frontend

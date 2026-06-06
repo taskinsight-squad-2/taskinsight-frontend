@@ -7,17 +7,12 @@ import {
   ResponseTimeResponse,
 } from "@/types/analytics";
 
-<<<<<<< HEAD
-const BASE_URL = process.env.NEXT_PUBLIC_ANALYTICS_API_URL;
+const BASE_URL = process.env.NEXT_PUBLIC_ANALYTICS_API_URL ?? "";
 
 if (!BASE_URL) {
-  throw new Error("NEXT_PUBLIC_ANALYTICS_API_URL não está definida");
-=======
-const BASE_URL = process.env.NEXT_PUBLIC_ANALYTICS_API_URL ?? '';
-
-if (!BASE_URL) {
-  console.warn("NEXT_PUBLIC_ANALYTICS_API_URL não está definida. Analytics desabilitado.");
->>>>>>> hugo-frontend
+  console.warn(
+    "NEXT_PUBLIC_ANALYTICS_API_URL não está definida. Analytics desabilitado.",
+  );
 }
 
 async function fetchMetrics<T>(endpoint: string, token?: string): Promise<T> {
@@ -59,8 +54,4 @@ export const analyticsApi = {
 
   getResponseTime: (token?: string) =>
     fetchMetrics<ResponseTimeResponse>("/task/metrics/response-time", token),
-<<<<<<< HEAD
 };
-=======
-};
->>>>>>> hugo-frontend

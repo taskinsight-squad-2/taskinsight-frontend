@@ -64,8 +64,4 @@ export interface ResponseTimeItem {
 export interface ResponseTimeResponse {
   success: boolean;
   data: ResponseTimeItem[];
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> hugo-frontend
