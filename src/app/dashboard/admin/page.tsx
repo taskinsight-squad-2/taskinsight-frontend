@@ -63,11 +63,12 @@ export default function AdminPage() {
   const { prefs, set: setPrefs } = useA11yPrefs()
   const dark = prefs.darkMode
 
-  const [tasks,    setTasks]    = useState<Task[]>([])
-  const [users,    setUsers]    = useState<User[]>([])
-  const [loading,  setLoading]  = useState(true)
-  const [error,    setError]    = useState('')
-  const [userName, setUserName] = useState('')
+  const [tasks,        setTasks]        = useState<Task[]>([])
+  const [users,        setUsers]        = useState<User[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [error,        setError]        = useState('')
+  const [userName,     setUserName]     = useState('')
+  const [userInitials, setUserInitials] = useState('U')
 
   // filtros da lista
   const [statusFilter,   setStatusFilter]   = useState<StatusFilter>('ALL')
@@ -80,8 +81,8 @@ export default function AdminPage() {
   const TASK_PAGE_SIZE = 12
 
   // gráfico
-  const [chartYear,  setChartYear]  = useState(0)
-  const [chartMonth, setChartMonth] = useState(-1)
+  const [chartYear,  setChartYear]  = useState(new Date().getFullYear())
+  const [chartMonth, setChartMonth] = useState(new Date().getMonth())
   const [chartWeek,  setChartWeek]  = useState(0)   // 0 = mês inteiro, 1-4 = semana
 
   const taskListRef = useRef<HTMLElement>(null)
@@ -94,6 +95,12 @@ export default function AdminPage() {
       if (!token || !stored) { router.replace('/login'); return }
       const u = JSON.parse(stored)
       setUserName(u.name?.split(' ')[0] ?? '')
+      const parts = (u.name ?? '').trim().split(/\s+/).filter(Boolean)
+      setUserInitials(
+        parts.length >= 2
+          ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+          : (parts[0]?.slice(0, 2) ?? 'U').toUpperCase()
+      )
       if (u.role !== 'admin') { router.replace('/dashboard'); return }
     } catch { router.replace('/login') }
   }, [router])
@@ -457,7 +464,7 @@ export default function AdminPage() {
 
           <div className={`flex items-center gap-2 ml-1 pl-3 border-l ${headerBdr}`}>
             <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-[10px] font-bold">
-              {userName.charAt(0).toUpperCase()}
+              {userInitials}
             </div>
             <div>
               <p className={`text-xs font-semibold ${text}`}>{userName}</p>
