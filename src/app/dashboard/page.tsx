@@ -64,6 +64,143 @@ function slaInfo(originalDeadline: string | null, finished: string | null): { da
   return { days, onTime: ms <= 0 }
 }
 
+interface SidebarProps {
+  collapsed: boolean
+  setSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>
+  dark: boolean
+  text: string
+  sidebarBg: string
+  sidebarBdr: string
+  sectionLbl: string
+  navItems: { label: string; icon: React.ReactNode; sort: SortMode; badge?: number }[]
+  sortMode: SortMode
+  setSortReset: (s: SortMode) => void
+  navAct: string
+  navInact: string
+  priorityFilter: Priority | 'All'
+  setPriorityFilterReset: (p: Priority | 'All') => void
+  catItem: string
+  categories: { label: string; count: number; priority: Priority; dot: string }[]
+  catBadge: string
+  tasksLength: number
+  userInitials: string
+  userName: string
+  userPlan: string
+  handleLogout: () => void
+  t: { menu: string; categories: string; freePlan: string; signOut: string }
+}
+
+function SidebarComponent({
+  collapsed, setSidebarCollapsed, dark, text, sidebarBg, sidebarBdr, sectionLbl,
+  navItems, sortMode, setSortReset, navAct, navInact,
+  priorityFilter, setPriorityFilterReset, catItem, categories, catBadge, tasksLength,
+  userInitials, userName, userPlan, handleLogout, t
+}: SidebarProps) {
+  return (
+    <aside
+      aria-label="Menu lateral de navegação"
+      className={`flex-shrink-0 ${sidebarBg} border-r ${sidebarBdr} flex flex-col h-full transition-all duration-300 relative z-50`}
+      style={{ width: collapsed ? 60 : 256 }}
+    >
+      <div className={`flex items-center ${collapsed ? 'justify-center' : 'justify-between px-5'} border-b ${sidebarBdr} py-5 min-h-[73px]`}>
+        {!collapsed && (
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-violet-500/30">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              </svg>
+            </div>
+            <span className={`font-bold ${text} text-base tracking-tight flex-1`}>TaskFlow</span>
+          </div>
+        )}
+        <button
+          onClick={() => setSidebarCollapsed(prev => !prev)}
+          title={collapsed ? 'Expandir menu' : 'Recolher menu'}
+          aria-label={collapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
+          className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors cursor-pointer hover:bg-violet-500/10 ${
+            dark ? 'text-white/50 hover:bg-white/10 hover:text-white' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'
+          }`}
+        >
+          {collapsed ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+          )}
+        </button>
+      </div>
+
+      <nav aria-label="Navegação principal" className="flex flex-col gap-0.5 px-2 py-4 flex-1 overflow-y-auto overflow-x-hidden">
+        {!collapsed && <p className={`text-[10px] font-bold ${sectionLbl} uppercase tracking-[0.15em] px-3 mb-2`}>{t.menu}</p>}
+        {navItems.map(item => (
+          <button key={item.label}
+            title={collapsed ? item.label : undefined}
+            onClick={() => setSortReset(item.sort)}
+            className={`flex items-center rounded-xl text-sm font-medium transition-all w-full ${
+              collapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5 text-left'
+            } ${sortMode === item.sort ? navAct : navInact}`}>
+            {item.icon}
+            {!collapsed && <span className="flex-1">{item.label}</span>}
+            {!collapsed && item.badge !== undefined && item.badge > 0 && (
+              <span className="text-[10px] font-bold bg-red-500 text-white rounded-full px-1.5 py-0.5 leading-none">{item.badge}</span>
+            )}
+          </button>
+        ))}
+        {!collapsed && (
+          <>
+            <div className="flex items-center px-3 mt-6 mb-2">
+              <p className={`text-[10px] font-bold ${sectionLbl} uppercase tracking-[0.15em]`}>{t.categories}</p>
+            </div>
+            <button
+              onClick={() => setPriorityFilterReset('All')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition ${priorityFilter === 'All' ? navAct : catItem}`}>
+              <span className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dark ? 'bg-white/30' : 'bg-slate-400'}`} />
+                Todas
+              </span>
+              <span className={`text-[11px] border rounded-full px-2 py-0.5 font-mono ${priorityFilter === 'All' ? (dark ? 'bg-violet-500/20 border-violet-500/30 text-violet-300' : 'bg-violet-100 border-violet-200 text-violet-600') : catBadge}`}>
+                {tasksLength}
+              </span>
+            </button>
+            {categories.map(cat => {
+              const isActive = priorityFilter === cat.priority
+              return (
+                <button key={cat.label} onClick={() => setPriorityFilterReset(isActive ? 'All' : cat.priority)}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition ${isActive ? navAct : catItem}`}>
+                  <span className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${cat.dot}`} />
+                    {cat.label}
+                  </span>
+                  <span className={`text-[11px] border rounded-full px-2 py-0.5 font-mono ${isActive ? (dark ? 'bg-violet-500/20 border-violet-500/30 text-violet-300' : 'bg-violet-100 border-violet-200 text-violet-600') : catBadge}`}>{cat.count}</span>
+                </button>
+              )
+            })}
+          </>
+        )}
+      </nav>
+
+      <div className={`border-t ${sidebarBdr} flex items-center transition-all duration-300 ${collapsed ? 'justify-center px-2 py-4' : 'gap-3 px-4 py-4'}`}>
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{userInitials}</div>
+        {!collapsed && (
+          <>
+            <div className="flex-1 min-w-0">
+              <p className={`text-sm font-semibold ${text} truncate`}>{userName || 'Usuário'}</p>
+              <p className={`text-xs ${userPlan}`}>{t.freePlan}</p>
+            </div>
+            <button onClick={handleLogout} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 transition">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              {t.signOut}
+            </button>
+          </>
+        )}
+      </div>
+    </aside>
+  )
+}
+
 export default function DashboardPage() {
   const router       = useRouter()
   const searchParams = useSearchParams()
@@ -73,7 +210,11 @@ export default function DashboardPage() {
   const { prefs, set: setPrefs }      = useA11yPrefs()
   const dark                          = prefs.darkMode
 
+  const [isClient, setIsClient] = useState(false)
+  useEffect(() => setIsClient(true), [])
+
   const [userName, setUserName] = useState('')
+  const [userInitials, setUserInitials] = useState('U')
   const [userRole, setUserRole] = useState<'user' | 'admin'>('user')
   const [greeting, setGreeting] = useState('')
   useEffect(() => {
@@ -83,6 +224,12 @@ export default function DashboardPage() {
         const u = JSON.parse(stored)
         setUserName(u.name?.split(' ')[0] ?? '')
         setUserRole(u.role ?? 'user')
+        const parts = (u.name ?? '').trim().split(/\s+/).filter(Boolean)
+        setUserInitials(
+          parts.length >= 2
+            ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+            : (parts[0]?.slice(0, 2) ?? 'U').toUpperCase()
+        )
       }
     } catch {}
     setGreeting(t.greeting(new Date().getHours()))
@@ -90,6 +237,29 @@ export default function DashboardPage() {
   const [filter, setFilter]           = useState<FilterTab>('All')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [showExpandTooltip, setShowExpandTooltip] = useState(false)
+  const sidebarCollapsedRef = useRef(sidebarCollapsed)
+  useEffect(() => { sidebarCollapsedRef.current = sidebarCollapsed }, [sidebarCollapsed])
+
+  // Expand via window capture — bypassa qualquer CSS ou z-index bloqueando o botão
+  useEffect(() => {
+    function onCapture(e: PointerEvent) {
+      if (sidebarCollapsedRef.current && e.clientX <= 64) setSidebarCollapsed(false)
+    }
+    function onMove(e: MouseEvent) {
+      if (sidebarCollapsedRef.current) setShowExpandTooltip(e.clientX <= 64 && e.clientY <= 80)
+      else setShowExpandTooltip(false)
+    }
+    window.addEventListener('pointerdown', onCapture, true)
+    window.addEventListener('click', onCapture as unknown as EventListener, true)
+    window.addEventListener('mousemove', onMove)
+    return () => {
+      window.removeEventListener('pointerdown', onCapture, true)
+      window.removeEventListener('click', onCapture as unknown as EventListener, true)
+      window.removeEventListener('mousemove', onMove)
+    }
+  }, [])
+
   const [sortMode, setSortMode]       = useState<SortMode>('default')
   const [pageSize, setPageSize]       = useState(5)
   const [page, setPage]               = useState(1)
@@ -103,14 +273,6 @@ export default function DashboardPage() {
     if (!stored) { router.replace('/login'); return }
   }, [router])
 
-  useEffect(() => {
-    function clearSession() {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-    }
-    window.addEventListener('beforeunload', clearSession)
-    return () => window.removeEventListener('beforeunload', clearSession)
-  }, [])
 
   const fetchTasks = useCallback(async () => {
     const token = localStorage.getItem('token') ?? undefined
@@ -494,7 +656,9 @@ export default function DashboardPage() {
     return [...taskYears].sort()
   }, [apiTasks])
 
-  const weekLabel = `Semana ${chartWeek} — ${monthNames[chartMonth.month]} ${chartMonth.year}`
+  const weekLabel = !isClient
+    ? 'Semana 1 — Janeiro 2025'
+    : `Semana ${chartWeek} — ${monthNames[chartMonth.month]} ${chartMonth.year}`
 
   // ── dados dos gráficos ─────────────────────────────────────────
   const chartData = useMemo(() => {
@@ -545,105 +709,6 @@ export default function DashboardPage() {
       const cx = (gx(ri) + gx(ri + 1)) / 2
       return `C ${cx} ${gy(next)} ${cx} ${gy(v)} ${gx(ri)} ${gy(v)}`
     }).join(' ') + ' Z'
-
-  const collapsed = sidebarCollapsed
-
-  const sidebar = (
-    <aside
-      aria-label="Menu lateral de navegação"
-      className={`flex-shrink-0 ${sidebarBg} border-r ${sidebarBdr} flex flex-col h-full transition-all duration-300 overflow-hidden`}
-      style={{ width: collapsed ? 60 : 256 }}
-    >
-      {/* header com toggle */}
-      <div className={`flex items-center border-b ${sidebarBdr} transition-all duration-300 ${collapsed ? 'justify-center px-0 py-5' : 'gap-2.5 px-5 py-5'}`}>
-        {!collapsed && (
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-violet-500/30">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          </div>
-        )}
-        {!collapsed && <span className={`font-bold ${text} text-base tracking-tight flex-1`}>TaskFlow</span>}
-        <button
-          onClick={() => setSidebarCollapsed(v => !v)}
-          aria-label={collapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
-          aria-expanded={!collapsed}
-          className={`w-7 h-7 flex items-center justify-center rounded-lg ${dark ? 'text-white/35 hover:bg-white/8 hover:text-white/70' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'} transition flex-shrink-0`}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-            style={{ transform: collapsed ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .3s' }}>
-            <polyline points="15 18 9 12 15 6"/>
-          </svg>
-        </button>
-      </div>
-
-      {/* nav */}
-      <nav aria-label="Navegação principal" className="flex flex-col gap-0.5 px-2 py-4 flex-1 overflow-y-auto overflow-x-hidden">
-        {!collapsed && <p className={`text-[10px] font-bold ${sectionLbl} uppercase tracking-[0.15em] px-3 mb-2`}>{t.menu}</p>}
-        {navItems.map(item => (
-          <button key={item.label}
-            title={collapsed ? item.label : undefined}
-            onClick={() => setSortReset(item.sort)}
-            className={`flex items-center rounded-xl text-sm font-medium transition-all w-full ${
-              collapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5 text-left'
-            } ${sortMode === item.sort ? navAct : navInact}`}>
-            {item.icon}
-            {!collapsed && <span className="flex-1">{item.label}</span>}
-            {!collapsed && item.badge !== undefined && item.badge > 0 && (
-              <span className="text-[10px] font-bold bg-red-500 text-white rounded-full px-1.5 py-0.5 leading-none">{item.badge}</span>
-            )}
-          </button>
-        ))}
-
-        {!collapsed && (
-          <>
-            <div className="flex items-center px-3 mt-6 mb-2">
-              <p className={`text-[10px] font-bold ${sectionLbl} uppercase tracking-[0.15em]`}>{t.categories}</p>
-            </div>
-            <button
-              onClick={() => setPriorityFilterReset('All')}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition ${priorityFilter === 'All' ? navAct : catItem}`}>
-              <span className="flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dark ? 'bg-white/30' : 'bg-slate-400'}`} />
-                Todas
-              </span>
-              <span className={`text-[11px] border rounded-full px-2 py-0.5 font-mono ${priorityFilter === 'All' ? (dark ? 'bg-violet-500/20 border-violet-500/30 text-violet-300' : 'bg-violet-100 border-violet-200 text-violet-600') : catBadge}`}>
-                {tasks.length}
-              </span>
-            </button>
-            {categories.map(cat => {
-              const isActive = priorityFilter === cat.priority
-              return (
-                <button key={cat.label} onClick={() => setPriorityFilterReset(isActive ? 'All' : cat.priority)}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition ${isActive ? navAct : catItem}`}>
-                  <span className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${cat.dot}`} />
-                    {cat.label}
-                  </span>
-                  <span className={`text-[11px] border rounded-full px-2 py-0.5 font-mono ${isActive ? (dark ? 'bg-violet-500/20 border-violet-500/30 text-violet-300' : 'bg-violet-100 border-violet-200 text-violet-600') : `${catBadge}`}`}>{cat.count}</span>
-                </button>
-              )
-            })}
-          </>
-        )}
-      </nav>
-
-      {/* footer */}
-      <div className={`border-t ${sidebarBdr} flex items-center transition-all duration-300 ${collapsed ? 'justify-center px-2 py-4' : 'gap-3 px-4 py-4'}`}>
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">HU</div>
-        {!collapsed && (
-          <>
-            <div className="flex-1 min-w-0">
-              <p className={`text-sm font-semibold ${text} truncate`}>{userName || 'Usuário'}</p>
-              <p className={`text-xs ${userPlan}`}>{t.freePlan}</p>
-            </div>
-            <button onClick={handleLogout} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 transition">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-              {t.signOut}
-            </button>
-          </>
-        )}
-      </div>
-    </aside>
-  )
 
   return (
     <div className={`min-h-screen flex ${pageBg} ${text} transition-colors duration-300`}>
@@ -817,19 +882,144 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div className="hidden md:flex flex-col h-screen sticky top-0">{sidebar}</div>
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-40 flex md:hidden">
-          <div className={`fixed inset-0 ${mobileOverlay} backdrop-blur-sm`} onClick={() => setSidebarOpen(false)} />
-          <div className="relative z-50 flex flex-col h-full">{sidebar}</div>
+      {/* ── SIDEBAR DESKTOP ── */}
+      <aside
+        aria-label="Menu lateral de navegação"
+        className="hidden md:flex flex-col border-r"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          height: '100vh',
+          width: sidebarCollapsed ? 60 : 256,
+          zIndex: 1000,
+          transition: 'width 300ms',
+          backgroundColor: dark ? '#0D1117' : '#ffffff',
+          borderColor: dark ? 'rgba(255,255,255,0.05)' : '#e2e8f0'
+        }}
+      >
+        <div
+          className={`flex border-b min-h-[73px] ${sidebarCollapsed ? 'flex-col items-center justify-center gap-2 py-3' : 'flex-row items-center justify-between px-5 py-5'}`}
+          style={{ borderColor: dark ? 'rgba(255,255,255,0.05)' : '#e2e8f0' }}
+        >
+          {sidebarCollapsed ? (
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-violet-500/30">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-violet-500/30">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              </div>
+              <span className={`font-bold ${text} text-base tracking-tight flex-1`}>TaskFlow</span>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            title={sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'}
+            aria-label={sidebarCollapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
+            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors cursor-pointer relative z-[110] ${
+              dark ? 'text-white/50 hover:bg-white/10 hover:text-white' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'
+            }`}
+          >
+            {sidebarCollapsed ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+            )}
+          </button>
+        </div>
+
+        <nav aria-label="Navegação principal" className="flex flex-col gap-0.5 px-2 py-4 flex-1 overflow-y-auto overflow-x-hidden">
+          {!sidebarCollapsed && <p className={`text-[10px] font-bold ${sectionLbl} uppercase tracking-[0.15em] px-3 mb-2`}>{t.menu}</p>}
+          {navItems.map(item => (
+            <button key={item.label}
+              title={sidebarCollapsed ? item.label : undefined}
+              onClick={() => setSortReset(item.sort)}
+              className={`flex items-center rounded-xl text-sm font-medium transition-all w-full ${
+                sidebarCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5 text-left'
+              } ${sortMode === item.sort ? navAct : navInact}`}>
+              {item.icon}
+              {!sidebarCollapsed && <span className="flex-1">{item.label}</span>}
+              {!sidebarCollapsed && item.badge !== undefined && item.badge > 0 && (
+                <span className="text-[10px] font-bold bg-red-500 text-white rounded-full px-1.5 py-0.5 leading-none">{item.badge}</span>
+              )}
+            </button>
+          ))}
+          {!sidebarCollapsed && (
+            <>
+              <div className="flex items-center px-3 mt-6 mb-2">
+                <p className={`text-[10px] font-bold ${sectionLbl} uppercase tracking-[0.15em]`}>{t.categories}</p>
+              </div>
+              <button onClick={() => setPriorityFilterReset('All')} className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition ${priorityFilter === 'All' ? navAct : catItem}`}>
+                <span className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dark ? 'bg-white/30' : 'bg-slate-400'}`} />
+                  Todas
+                </span>
+                <span className={`text-[11px] border rounded-full px-2 py-0.5 font-mono ${priorityFilter === 'All' ? (dark ? 'bg-violet-500/20 border-violet-500/30 text-violet-300' : 'bg-violet-100 border-violet-200 text-violet-600') : catBadge}`}>{tasks.length}</span>
+              </button>
+              {categories.map(cat => {
+                const isActive = priorityFilter === cat.priority
+                return (
+                  <button key={cat.label} onClick={() => setPriorityFilterReset(isActive ? 'All' : cat.priority)} className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition ${isActive ? navAct : catItem}`}>
+                    <span className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${cat.dot}`} />
+                      {cat.label}
+                    </span>
+                    <span className={`text-[11px] border rounded-full px-2 py-0.5 font-mono ${isActive ? (dark ? 'bg-violet-500/20 border-violet-500/30 text-violet-300' : 'bg-violet-100 border-violet-200 text-violet-600') : catBadge}`}>{cat.count}</span>
+                  </button>
+                )
+              })}
+            </>
+          )}
+        </nav>
+
+        <div className={`border-t flex items-center p-4 gap-3 ${sidebarCollapsed ? 'justify-center' : ''}`} style={{ borderColor: dark ? 'rgba(255,255,255,0.05)' : '#e2e8f0' }}>
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{userInitials}</div>
+          {!sidebarCollapsed && (
+            <div className="flex-1 min-w-0 flex items-center justify-between">
+              <div className="truncate pr-2">
+                <p className={`text-sm font-semibold ${text} truncate`}>{userName || 'Usuário'}</p>
+                <p className={`text-xs ${userPlan}`}>{t.freePlan}</p>
+              </div>
+              <button onClick={handleLogout} className="px-2 py-1 rounded-lg text-xs font-semibold bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 transition flex-shrink-0">{t.signOut}</button>
+            </div>
+          )}
+        </div>
+      </aside>
+
+      {/* Tooltip customizado para expandir — aparece quando o botão está coberto por CSS */}
+      {sidebarCollapsed && showExpandTooltip && (
+        <div aria-hidden="true" style={{ position: 'fixed', left: 68, top: 32, zIndex: 9999, background: '#1e293b', color: '#fff', fontSize: 12, padding: '4px 8px', borderRadius: 6, pointerEvents: 'none', whiteSpace: 'nowrap' }}>
+          Expandir menu
         </div>
       )}
 
-      <main id="main-content" className="flex-1 flex flex-col min-h-screen overflow-auto" tabIndex={-1}>
+      {/* ── SIDEBAR MOBILE ── */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-[200] flex md:hidden">
+          <div className={`fixed inset-0 ${mobileOverlay} backdrop-blur-sm`} onClick={() => setSidebarOpen(false)} />
+          <div className="relative flex flex-col h-full w-64" style={{ backgroundColor: dark ? '#0D1117' : '#ffffff' }}>
+            <div className="p-5 flex justify-between items-center border-b" style={{ borderColor: dark ? 'rgba(255,255,255,0.05)' : '#e2e8f0' }}>
+              <span className={`font-bold ${text} text-base`}>TaskFlow</span>
+              <button onClick={() => setSidebarOpen(false)} className={dark ? 'text-white/50' : 'text-slate-400'}>✕</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <main
+        id="main-content"
+        className="flex-1 flex flex-col min-h-screen overflow-auto min-w-0"
+        style={{ marginLeft: sidebarCollapsed ? 60 : 256, transition: 'margin-left 300ms' }}
+        tabIndex={-1}
+      >
 
         {/* Header */}
-        <div className={`flex items-center justify-between px-6 py-4 border-b ${headerBdr} ${headerBg} backdrop-blur-xl sticky top-0 z-30 transition-colors duration-300`}>
-          <div className="flex items-center gap-3">
+        <div className={`relative flex items-center justify-between px-6 py-4 border-b ${headerBdr} ${headerBg} sticky top-0 z-30 transition-colors duration-300`}>
+          <div className="absolute inset-0 backdrop-blur-xl pointer-events-none" />
+          <div className="relative flex items-center gap-3">
             <button onClick={() => setSidebarOpen(true)} aria-label="Abrir menu lateral" aria-expanded={sidebarOpen} className={`md:hidden ${mobileTrigger} transition`}>
               <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
@@ -838,7 +1028,7 @@ export default function DashboardPage() {
               <p className="text-xs text-violet-500 mt-0.5">{t.pendingTasksMsg(nPending)}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="relative flex items-center gap-2">
             <button
               onClick={triggerVLibras}
               aria-label="VLibras — Intérprete de Libras"
@@ -893,7 +1083,7 @@ export default function DashboardPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { label: 'Total',       value: total,     accent: 'text-violet-500', iconBg: 'bg-violet-500/10 border-violet-500/20', icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg> },
-              { label: 'Pendente',    value: nPending,  accent: 'text-slate-500',  iconBg: 'bg-slate-500/10 border-slate-500/20',  icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> },
+              { label: 'Pendente',    value: nPending,  accent: dark ? 'text-white/60' : 'text-slate-500',  iconBg: 'bg-slate-500/10 border-slate-500/20',  icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> },
               { label: 'Andamento',   value: nProgress, accent: 'text-blue-500',   iconBg: 'bg-blue-500/10 border-blue-500/20',    icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> },
               { label: 'Concluídas',  value: nDone,     accent: 'text-emerald-500',iconBg: 'bg-emerald-500/10 border-emerald-500/20', icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> },
             ].map(s => (
@@ -949,7 +1139,7 @@ export default function DashboardPage() {
                   </select>
                   <span className={`text-xs ${textFaint}`}>por página</span>
                 </div>
-                <button onClick={completeAll} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 hover:bg-emerald-500/20 transition">
+                <button onClick={completeAll} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition ${dark ? 'text-emerald-400' : 'text-emerald-600'}`}>
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                   {t.completeAll}
                 </button>
@@ -1312,7 +1502,7 @@ export default function DashboardPage() {
                     className={`w-6 h-6 flex items-center justify-center rounded-lg border ${dark ? 'border-white/10 text-white/45 hover:bg-white/8 hover:text-white/75' : 'border-slate-200 text-slate-400 hover:bg-slate-100 hover:text-slate-700'} transition`}>
                     <svg aria-hidden="true" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
                   </button>
-                  <span aria-live="polite" aria-atomic="true" className={`text-xs font-semibold ${text} min-w-[180px] text-center`}>{weekLabel}</span>
+                  <span aria-live="polite" aria-atomic="true" suppressHydrationWarning className={`text-xs font-semibold ${text} min-w-[180px] text-center`}>{weekLabel}</span>
                   <button onClick={nextWeek} aria-label="Próxima semana"
                     className={`w-6 h-6 flex items-center justify-center rounded-lg border ${dark ? 'border-white/10 text-white/45 hover:bg-white/8 hover:text-white/75' : 'border-slate-200 text-slate-400 hover:bg-slate-100 hover:text-slate-700'} transition`}>
                     <svg aria-hidden="true" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
@@ -1362,6 +1552,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="px-5 pt-5 pb-4">
+              {isClient ? (
               <svg
                 width="100%"
                 viewBox={`0 0 ${GW} ${GH + 40}`}
@@ -1370,8 +1561,8 @@ export default function DashboardPage() {
                 aria-labelledby="chart-title chart-desc"
                 onMouseLeave={() => setChartHoverIdx(null)}
               >
-                <title id="chart-title" suppressHydrationWarning>Gráfico de progresso — {weekLabel}</title>
-                <desc id="chart-desc" suppressHydrationWarning>
+                <title id="chart-title">Gráfico de progresso — {weekLabel}</title>
+                <desc id="chart-desc">
                   Linha de tarefas concluídas, em andamento e previsto por dia da semana.
                   {doneSeries[doneSeries.length - 1]} concluídas e {progressSeries[progressSeries.length - 1]} em andamento no último dia visível.
                 </desc>
@@ -1521,6 +1712,7 @@ export default function DashboardPage() {
                   )
                 })()}
               </svg>
+              ) : <div className="h-[260px]" />}
 
               {/* insight */}
               <div className={`mt-1 pt-3 border-t ${dark ? 'border-white/5' : 'border-slate-100'}`}>
