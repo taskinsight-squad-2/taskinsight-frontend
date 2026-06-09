@@ -7,7 +7,6 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { adminService, ApiError } from '@/services/admin.service'
-import { triggerVLibras } from '@/components/VLibras'
 import { useA11yPrefs } from '@/hooks/useA11yPrefs'
 import { type Locale } from '@/lib/i18n'
 import type { Task } from '@/types/task'
@@ -63,11 +62,13 @@ export default function AdminPage() {
   const { prefs, set: setPrefs } = useA11yPrefs()
   const dark = prefs.darkMode
 
-  const [tasks,    setTasks]    = useState<Task[]>([])
-  const [users,    setUsers]    = useState<User[]>([])
-  const [loading,  setLoading]  = useState(true)
-  const [error,    setError]    = useState('')
-  const [userName, setUserName] = useState('')
+
+  const [tasks,        setTasks]        = useState<Task[]>([])
+  const [users,        setUsers]        = useState<User[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [error,        setError]        = useState('')
+  const [userName,     setUserName]     = useState('')
+  const [userInitials, setUserInitials] = useState('U')
 
   // filtros da lista
   const [statusFilter,   setStatusFilter]   = useState<StatusFilter>('ALL')
@@ -80,8 +81,8 @@ export default function AdminPage() {
   const TASK_PAGE_SIZE = 12
 
   // gráfico
-  const [chartYear,  setChartYear]  = useState(0)
-  const [chartMonth, setChartMonth] = useState(-1)
+  const [chartYear,  setChartYear]  = useState(new Date().getFullYear())
+  const [chartMonth, setChartMonth] = useState(new Date().getMonth())
   const [chartWeek,  setChartWeek]  = useState(0)   // 0 = mês inteiro, 1-4 = semana
 
   const taskListRef = useRef<HTMLElement>(null)
@@ -94,6 +95,12 @@ export default function AdminPage() {
       if (!token || !stored) { router.replace('/login'); return }
       const u = JSON.parse(stored)
       setUserName(u.name?.split(' ')[0] ?? '')
+      const parts = (u.name ?? '').trim().split(/\s+/).filter(Boolean)
+      setUserInitials(
+        parts.length >= 2
+          ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+          : (parts[0]?.slice(0, 2) ?? 'U').toUpperCase()
+      )
       if (u.role !== 'admin') { router.replace('/dashboard'); return }
     } catch { router.replace('/login') }
   }, [router])
@@ -414,16 +421,7 @@ export default function AdminPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <button onClick={triggerVLibras} aria-label="VLibras — Intérprete de Libras"
-            className="h-8 px-2.5 flex items-center gap-1.5 rounded-lg hover:opacity-90 active:scale-95 transition-all"
-            style={{ backgroundColor: '#1351B4' }}>
-            <svg aria-hidden width="15" height="15" viewBox="0 0 64 64" fill="white">
-              <path d="M48 6c0-2.2-1.8-4-4-4s-4 1.8-4 4v20h-2V4c0-2.2-1.8-4-4-4s-4 1.8-4 4v22h-2V8c0-2.2-1.8-4-4-4S26 5.8 26 8v24h-2v-14c0-2.2-1.8-4-4-4s-4 1.8-4 4v18c0 14.4 9.6 22 24 22s22-8 22-22V18c0-2.2-1.8-4-4-4s-4 1.8-4 4v-12z"/>
-            </svg>
-            <span className="text-white text-[11px] font-bold tracking-wide">VLibras</span>
-          </button>
-
-          <button onClick={() => setPrefs('darkMode', !dark)}
+<button onClick={() => setPrefs('darkMode', !dark)}
             aria-label={dark ? 'Ativar modo claro' : 'Ativar modo escuro'}
             className={`h-8 px-3 flex items-center gap-1.5 rounded-lg border ${ctrlBg} hover:opacity-80 transition text-xs font-semibold`}>
             {dark ? '☀' : '🌙'}
@@ -457,7 +455,7 @@ export default function AdminPage() {
 
           <div className={`flex items-center gap-2 ml-1 pl-3 border-l ${headerBdr}`}>
             <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-[10px] font-bold">
-              {userName.charAt(0).toUpperCase()}
+              {userInitials}
             </div>
             <div>
               <p className={`text-xs font-semibold ${text}`}>{userName}</p>
