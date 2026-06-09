@@ -26,7 +26,6 @@ function uid(u: User): string {
   return u.id ?? (u as unknown as Record<string, string>)._id ?? ''
 }
 
-const PT_MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
 // ── tipos ─────────────────────────────────────────────────────────────────────
 type StatusFilter   = 'ALL' | 'PENDING' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED' | 'OVERDUE'
@@ -233,7 +232,7 @@ export default function AdminPage() {
       const endStr   = isoDay(new Date(chartYear, chartMonth, end))
       const inRange  = (iso: string | null | undefined) => !!iso && iso >= startStr && iso <= endStr
       return {
-        label:       `Sem ${w}`,
+        label:       t.weekAbbr(w),
         planejadas:  tasks.filter(t => inRange(t.dueDate)).length,
         concluidas:  tasks.filter(t => t.status === 'DONE' && inRange(t.completedAt ?? t.updatedAt)).length,
         emAndamento: tasks.filter(t => t.status === 'IN_PROGRESS' && inRange(t.startedAt)).length,
@@ -246,14 +245,14 @@ export default function AdminPage() {
       const end    = Math.min(chartWeek * 7, daysInMonth)
       return {
         chartPoints:  Array.from({ length: end - start + 1 }, (_, i) => dayPoint(start + i)),
-        chartLabel:   `Semana ${chartWeek} — ${PT_MONTHS[chartMonth]} ${chartYear}`,
+        chartLabel:   t.weekLabelFn(chartWeek, t.months[chartMonth], chartYear),
         weeksInMonth: wCount,
       }
     }
 
     return {
       chartPoints:  Array.from({ length: wCount }, (_, i) => weekPoint(i + 1)),
-      chartLabel:   `${PT_MONTHS[chartMonth]} ${chartYear}`,
+      chartLabel:   `${t.months[chartMonth]} ${chartYear}`,
       weeksInMonth: wCount,
     }
   }, [tasks, chartYear, chartMonth, chartWeek])
@@ -290,30 +289,30 @@ export default function AdminPage() {
   // dados para gráfico prioridade × status
   const priorityChartData = useMemo(() => [
     {
-      label: 'Alta',
-      'Não iniciada': tasks.filter(t => t.priority === 'HIGH' && t.status === 'PENDING').length,
-      'Em andamento': tasks.filter(t => t.priority === 'HIGH' && t.status === 'IN_PROGRESS').length,
-      'Concluídas':   tasks.filter(t => t.priority === 'HIGH' && t.status === 'DONE').length,
-      'Canceladas':   tasks.filter(t => t.priority === 'HIGH' && t.status === 'CANCELLED').length,
-      'Em atraso':    tasks.filter(t => t.priority === 'HIGH' && t.status === 'IN_PROGRESS' && !!t.dueDate && t.dueDate < today).length,
+      label: t.priorityHigh,
+      'Não iniciada': tasks.filter(tk => tk.priority === 'HIGH' && tk.status === 'PENDING').length,
+      'Em andamento': tasks.filter(tk => tk.priority === 'HIGH' && tk.status === 'IN_PROGRESS').length,
+      'Concluídas':   tasks.filter(tk => tk.priority === 'HIGH' && tk.status === 'DONE').length,
+      'Canceladas':   tasks.filter(tk => tk.priority === 'HIGH' && tk.status === 'CANCELLED').length,
+      'Em atraso':    tasks.filter(tk => tk.priority === 'HIGH' && tk.status === 'IN_PROGRESS' && !!tk.dueDate && tk.dueDate < today).length,
     },
     {
-      label: 'Média',
-      'Não iniciada': tasks.filter(t => t.priority === 'MEDIUM' && t.status === 'PENDING').length,
-      'Em andamento': tasks.filter(t => t.priority === 'MEDIUM' && t.status === 'IN_PROGRESS').length,
-      'Concluídas':   tasks.filter(t => t.priority === 'MEDIUM' && t.status === 'DONE').length,
-      'Canceladas':   tasks.filter(t => t.priority === 'MEDIUM' && t.status === 'CANCELLED').length,
-      'Em atraso':    tasks.filter(t => t.priority === 'MEDIUM' && t.status === 'IN_PROGRESS' && !!t.dueDate && t.dueDate < today).length,
+      label: t.priorityMedium,
+      'Não iniciada': tasks.filter(tk => tk.priority === 'MEDIUM' && tk.status === 'PENDING').length,
+      'Em andamento': tasks.filter(tk => tk.priority === 'MEDIUM' && tk.status === 'IN_PROGRESS').length,
+      'Concluídas':   tasks.filter(tk => tk.priority === 'MEDIUM' && tk.status === 'DONE').length,
+      'Canceladas':   tasks.filter(tk => tk.priority === 'MEDIUM' && tk.status === 'CANCELLED').length,
+      'Em atraso':    tasks.filter(tk => tk.priority === 'MEDIUM' && tk.status === 'IN_PROGRESS' && !!tk.dueDate && tk.dueDate < today).length,
     },
     {
-      label: 'Baixa',
-      'Não iniciada': tasks.filter(t => t.priority === 'LOW' && t.status === 'PENDING').length,
-      'Em andamento': tasks.filter(t => t.priority === 'LOW' && t.status === 'IN_PROGRESS').length,
-      'Concluídas':   tasks.filter(t => t.priority === 'LOW' && t.status === 'DONE').length,
-      'Canceladas':   tasks.filter(t => t.priority === 'LOW' && t.status === 'CANCELLED').length,
-      'Em atraso':    tasks.filter(t => t.priority === 'LOW' && t.status === 'IN_PROGRESS' && !!t.dueDate && t.dueDate < today).length,
+      label: t.priorityLow,
+      'Não iniciada': tasks.filter(tk => tk.priority === 'LOW' && tk.status === 'PENDING').length,
+      'Em andamento': tasks.filter(tk => tk.priority === 'LOW' && tk.status === 'IN_PROGRESS').length,
+      'Concluídas':   tasks.filter(tk => tk.priority === 'LOW' && tk.status === 'DONE').length,
+      'Canceladas':   tasks.filter(tk => tk.priority === 'LOW' && tk.status === 'CANCELLED').length,
+      'Em atraso':    tasks.filter(tk => tk.priority === 'LOW' && tk.status === 'IN_PROGRESS' && !!tk.dueDate && tk.dueDate < today).length,
     },
-  ], [tasks, today])
+  ], [tasks, today, locale])
 
   // lista filtrada
   const filteredTasks = useMemo(() => {
@@ -408,7 +407,7 @@ export default function AdminPage() {
               <svg aria-hidden width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="15 18 9 12 15 6"/>
               </svg>
-              <span className="hidden sm:inline">Dashboard</span>
+              <span>Dashboard</span>
             </button>
             <span className={`${dark ? 'text-white/15' : 'text-slate-300'} select-none flex-shrink-0`}>|</span>
             <div className="flex items-center gap-2 min-w-0">
@@ -427,7 +426,7 @@ export default function AdminPage() {
           <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
             {/* sempre: dark mode */}
             <button onClick={() => setPrefs('darkMode', !dark)}
-              aria-label={dark ? 'Ativar modo claro' : 'Ativar modo escuro'}
+              aria-label={dark ? t.lightModeAria : t.darkModeAria}
               className={`h-8 w-8 flex items-center justify-center rounded-lg border ${ctrlBg} hover:opacity-80 transition text-sm`}>
               {dark ? '☀️' : '🌙'}
             </button>
@@ -446,7 +445,7 @@ export default function AdminPage() {
               ))}
             </div>
             {/* sempre: atualizar */}
-            <button onClick={loadData} aria-label="Atualizar dados"
+            <button onClick={loadData} aria-label={t.refreshAria}
               className={`h-8 w-8 flex items-center justify-center rounded-lg border ${ctrlBg} hover:opacity-80 transition`}>
               <svg aria-hidden width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
@@ -558,8 +557,8 @@ export default function AdminPage() {
                     <select value={chartMonth}
                       onChange={e => { setChartMonth(Number(e.target.value)); setChartWeek(0) }}
                       className={selectCls}
-                      aria-label="Selecionar mês">
-                      {PT_MONTHS.map((m, i) => (
+                      aria-label={t.monthSelectAria}>
+                      {t.months.map((m, i) => (
                         <option key={i} value={i} style={{ backgroundColor: dark ? '#0D1117' : 'white' }}>{m}</option>
                       ))}
                     </select>
@@ -630,19 +629,19 @@ export default function AdminPage() {
                         axisLine={false} tickLine={false}/>
                       <Tooltip content={<ChartTooltip dark={dark}/>}/>
                       {/* planejadas — fantasma tracejado */}
-                      <Area type="monotone" dataKey="planejadas" name="Planejadas"
+                      <Area type="monotone" dataKey="planejadas" name={t.sPlanned}
                         stroke="#7c3aed" strokeWidth={1.5} strokeDasharray="5 4"
                         fill="url(#gPlan)" dot={false} activeDot={{ r: 4 }}/>
                       {/* em atraso — sombra laranja */}
-                      <Area type="monotone" dataKey="emAtraso" name="Em atraso"
+                      <Area type="monotone" dataKey="emAtraso" name={t.sOverdue}
                         stroke="#f97316" strokeWidth={2}
                         fill="url(#gOver)" dot={false} activeDot={{ r: 4 }}/>
                       {/* em andamento */}
-                      <Area type="monotone" dataKey="emAndamento" name="Em andamento"
+                      <Area type="monotone" dataKey="emAndamento" name={t.sInProgress}
                         stroke="#3b82f6" strokeWidth={2}
                         fill="url(#gProg)" dot={false} activeDot={{ r: 4 }}/>
                       {/* concluídas — linha mais grossa */}
-                      <Area type="monotone" dataKey="concluidas" name="Concluídas"
+                      <Area type="monotone" dataKey="concluidas" name={t.sDonePlural}
                         stroke="#10b981" strokeWidth={2.5}
                         fill="url(#gDone)" dot={false} activeDot={{ r: 4 }}/>
                     </AreaChart>
@@ -768,11 +767,11 @@ export default function AdminPage() {
                               )
                             }}
                           />
-                          <Bar dataKey="Não iniciada" stackId="s" fill="#64748b" radius={0}/>
-                          <Bar dataKey="Em andamento" stackId="s" fill="#3b82f6" radius={0}/>
-                          <Bar dataKey="Em atraso"    stackId="s" fill="#f97316" radius={0}/>
-                          <Bar dataKey="Concluídas"   stackId="s" fill="#10b981" radius={0}/>
-                          <Bar dataKey="Canceladas"   stackId="s" fill="#f43f5e" radius={[0,3,3,0]}/>
+                          <Bar dataKey="Não iniciada" name={t.sNotStarted} stackId="s" fill="#64748b" radius={0}/>
+                          <Bar dataKey="Em andamento" name={t.sInProgress} stackId="s" fill="#3b82f6" radius={0}/>
+                          <Bar dataKey="Em atraso"    name={t.sOverdue}    stackId="s" fill="#f97316" radius={0}/>
+                          <Bar dataKey="Concluídas"   name={t.sDonePlural} stackId="s" fill="#10b981" radius={0}/>
+                          <Bar dataKey="Canceladas"   name={t.sCancelled}  stackId="s" fill="#f43f5e" radius={[0,3,3,0]}/>
                         </BarChart>
                       </ResponsiveContainer>
                     )
@@ -807,7 +806,7 @@ export default function AdminPage() {
                                   ? `${dark ? 'bg-white/10 border-white/20 text-white/80' : 'bg-slate-100 border-slate-300 text-slate-600'}`
                                   : `${dark ? 'border-white/10 text-white/35 hover:text-white/60' : 'border-slate-200 text-slate-300 hover:text-slate-500'} bg-transparent`
                               }`}>
-                              Todas
+                              {t.pAll}
                             </button>
                             {PROD_FILTERS.map(f => {
                               const active = prodFilter === f.key
@@ -914,8 +913,8 @@ export default function AdminPage() {
                       const ptotal = (p['Não iniciada'] as number) + (p['Em andamento'] as number) + (p['Concluídas'] as number) + (p['Canceladas'] as number)
                       const pDone  = p['Concluídas'] as number
                       const rate   = ptotal > 0 ? Math.round((pDone / ptotal) * 100) : 0
-                      const accent = p.label === 'Alta' ? { text: 'text-red-400', bar: '#ef4444', bg: dark ? 'bg-red-500/10 border-red-500/15' : 'bg-red-50 border-red-100' }
-                        : p.label === 'Média' ? { text: 'text-amber-400', bar: '#f59e0b', bg: dark ? 'bg-amber-500/10 border-amber-500/15' : 'bg-amber-50 border-amber-100' }
+                      const accent = p.label === t.priorityHigh ? { text: 'text-red-400', bar: '#ef4444', bg: dark ? 'bg-red-500/10 border-red-500/15' : 'bg-red-50 border-red-100' }
+                        : p.label === t.priorityMedium ? { text: 'text-amber-400', bar: '#f59e0b', bg: dark ? 'bg-amber-500/10 border-amber-500/15' : 'bg-amber-50 border-amber-100' }
                         : { text: 'text-emerald-400', bar: '#10b981', bg: dark ? 'bg-emerald-500/10 border-emerald-500/15' : 'bg-emerald-50 border-emerald-100' }
                       return (
                         <div key={p.label} className={`rounded-xl border ${accent.bg} px-3 py-2.5`}>
@@ -961,11 +960,11 @@ export default function AdminPage() {
                           axisLine={false} tickLine={false}/>
                         <Tooltip content={<ChartTooltip dark={dark}/>}
                           cursor={{ fill: dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' }}/>
-                        <Bar dataKey="Não iniciada" stackId="p" fill="#64748b" radius={0}/>
-                        <Bar dataKey="Em andamento" stackId="p" fill="#3b82f6" radius={0}/>
-                        <Bar dataKey="Em atraso"    stackId="p" fill="#f97316" radius={0}/>
-                        <Bar dataKey="Concluídas"   stackId="p" fill="#10b981" radius={0}/>
-                        <Bar dataKey="Canceladas"   stackId="p" fill="#f43f5e" radius={[0,3,3,0]}/>
+                        <Bar dataKey="Não iniciada" name={t.sNotStarted} stackId="p" fill="#64748b" radius={0}/>
+                        <Bar dataKey="Em andamento" name={t.sInProgress} stackId="p" fill="#3b82f6" radius={0}/>
+                        <Bar dataKey="Em atraso"    name={t.sOverdue}    stackId="p" fill="#f97316" radius={0}/>
+                        <Bar dataKey="Concluídas"   name={t.sDonePlural} stackId="p" fill="#10b981" radius={0}/>
+                        <Bar dataKey="Canceladas"   name={t.sCancelled}  stackId="p" fill="#f43f5e" radius={[0,3,3,0]}/>
                       </BarChart>
                     </ResponsiveContainer>
                   </div>

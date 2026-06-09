@@ -192,7 +192,7 @@ export default function LoginPage() {
       </div>
 
       {/* ── Left panel: branding (decorativo, oculto de leitores de tela) ── */}
-      <div aria-hidden="true" className={`hidden lg:flex flex-col justify-between w-[420px] flex-shrink-0 relative px-10 py-10 border-r ${divider} ${panelBg} transition-colors duration-300`}>
+      <div aria-hidden="true" className={`hidden md:flex flex-col justify-between w-1/3 min-w-[280px] flex-shrink-0 relative px-8 py-10 border-r ${divider} ${panelBg} transition-colors duration-300`}>
         {dark && <>
           <div className="absolute inset-0 bg-gradient-to-br from-violet-950/60 via-transparent to-transparent pointer-events-none" />
           <div className="absolute -top-40 -left-40 w-96 h-96 bg-violet-600/20 rounded-full blur-3xl pointer-events-none" />
@@ -204,32 +204,35 @@ export default function LoginPage() {
         </>}
 
         {/* Logo */}
-        <div className="relative flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <div className="relative flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/40">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
             </svg>
           </div>
-          <span className="font-bold text-lg tracking-tight">TaskFlow</span>
+          <div>
+            <span className="font-black text-2xl tracking-tight block">TaskFlow</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-violet-500 mt-0.5 block">Task Management</span>
+          </div>
         </div>
 
         {/* Center content */}
         <div className="relative flex flex-col gap-8">
           <div>
-            <h2 className="text-3xl font-extrabold leading-tight tracking-tight">
-              Gerencie tarefas<br />
-              <span className="bg-gradient-to-r from-violet-500 to-indigo-500 bg-clip-text text-transparent">com precisão.</span>
+            <h2 className="text-4xl font-black leading-tight tracking-tight">
+              {t.brandHeadlineLine1}<br />
+              <span className="bg-gradient-to-r from-violet-500 to-indigo-500 bg-clip-text text-transparent">{t.brandHeadlineLine2}</span>
             </h2>
-            <p className={`mt-3 text-sm ${textMuted} leading-relaxed`}>
-              Organize, priorize e entregue. Visibilidade total do seu fluxo de trabalho em um só lugar.
+            <p className={`mt-4 text-sm ${textMuted} leading-relaxed`}>
+              {t.brandTagline}
             </p>
           </div>
 
           <div className="flex flex-col gap-3">
             {[
-              { icon: '⚡', text: 'Atualizações em tempo real' },
-              { icon: '🎯', text: 'Prioridades inteligentes' },
-              { icon: '📊', text: 'Analytics de produtividade' },
+              { icon: '⚡', text: t.brandFeature1 },
+              { icon: '🎯', text: t.brandFeature2 },
+              { icon: '📊', text: t.brandFeature3 },
             ].map(item => (
               <div key={item.text} className={`flex items-center gap-3 text-sm ${featureItem}`}>
                 <span className={`w-7 h-7 rounded-lg ${featureIcon} border flex items-center justify-center text-xs flex-shrink-0`}>{item.icon}</span>
@@ -249,7 +252,7 @@ export default function LoginPage() {
 
         {/* Controls */}
         <div className="absolute top-5 right-5 flex items-center gap-2">
-          <label htmlFor="lang-select" className="sr-only">Idioma</label>
+          <label htmlFor="lang-select" className="sr-only">{t.langLabel}</label>
           <select
             id="lang-select"
             value={locale}
@@ -261,8 +264,8 @@ export default function LoginPage() {
             <option value="en" style={{ backgroundColor: dark ? '#0D1117' : 'white' }}>EN</option>
           </select>
           <button
-            onClick={() => togglePref('darkMode', 'Modo escuro')}
-            aria-label={dark ? 'Ativar modo claro' : 'Ativar modo escuro'}
+            onClick={() => togglePref('darkMode', t.a11yDarkModeLabel)}
+            aria-label={dark ? t.lightModeAria : t.darkModeAria}
             aria-pressed={dark}
             className={`w-8 h-8 flex items-center justify-center rounded-lg border ${ctrlBg} hover:opacity-80 transition text-sm`}
           >
@@ -271,7 +274,7 @@ export default function LoginPage() {
         </div>
 
         {/* Mobile logo */}
-        <div className="lg:hidden flex items-center gap-2 mb-8">
+        <div className="md:hidden flex items-center gap-2 mb-8">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
@@ -288,10 +291,10 @@ export default function LoginPage() {
             {!forgotMode && (
               <div className="mb-7">
                 <h1 className="text-xl font-bold tracking-tight">
-                  {tab === 'signin' ? 'Entrar na conta' : 'Criar conta'}
+                  {tab === 'signin' ? t.signInTitle : t.registerTitle}
                 </h1>
                 <p className={`text-sm ${textMuted} mt-1`}>
-                  {tab === 'signin' ? 'Acesse seu workspace' : 'Comece gratuitamente hoje'}
+                  {tab === 'signin' ? t.signInSubtitle : t.registerSubtitle}
                 </p>
               </div>
             )}
@@ -358,7 +361,7 @@ export default function LoginPage() {
 
             {/* Sign In */}
             {!forgotMode && tab === 'signin' && (
-              <form onSubmit={handleLogin} className="flex flex-col gap-4" noValidate aria-label="Formulário de login">
+              <form onSubmit={handleLogin} className="flex flex-col gap-4" noValidate aria-label={t.loginFormAria}>
                 <div>
                   <label htmlFor="login-email" className={labelCls}>{t.email}</label>
                   <input
@@ -390,7 +393,7 @@ export default function LoginPage() {
                       className={inputClsWith('password')}
                     />
                     <button type="button" onClick={() => setShowPassword(v => !v)}
-                      aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                      aria-label={showPassword ? t.hidePasswordAria : t.showPasswordAria}
                       aria-pressed={showPassword}
                       className={`absolute right-3 top-1/2 -translate-y-1/2 ${eyeBtn} transition text-xs`}>
                       <span aria-hidden="true">{showPassword ? '🙈' : '👁'}</span>
@@ -412,7 +415,7 @@ export default function LoginPage() {
 
             {/* Register */}
             {!forgotMode && tab === 'register' && (
-              <form onSubmit={handleRegister} className="flex flex-col gap-4" noValidate aria-label="Formulário de cadastro">
+              <form onSubmit={handleRegister} className="flex flex-col gap-4" noValidate aria-label={t.registerFormAria}>
                 <div>
                   <label htmlFor="reg-name" className={labelCls}>{t.name}</label>
                   <input
@@ -452,13 +455,13 @@ export default function LoginPage() {
                       className={inputClsWith('regPassword')}
                     />
                     <button type="button" onClick={() => setShowPassword(v => !v)}
-                      aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                      aria-label={showPassword ? t.hidePasswordAria : t.showPasswordAria}
                       aria-pressed={showPassword}
                       className={`absolute right-3 top-1/2 -translate-y-1/2 ${eyeBtn} transition text-xs`}>
                       <span aria-hidden="true">{showPassword ? '🙈' : '👁'}</span>
                     </button>
                   </div>
-                  <p id="pw-hint" className={`text-[11px] mt-1 ${dark ? 'text-white/35' : 'text-slate-400'}`}>Mínimo de 6 caracteres.</p>
+                  <p id="pw-hint" className={`text-[11px] mt-1 ${dark ? 'text-white/35' : 'text-slate-400'}`}>{t.passwordHint}</p>
                   <FieldError errKey="regPassword" />
                 </div>
                 <div>
@@ -474,7 +477,7 @@ export default function LoginPage() {
                       className={inputClsWith('confirm')}
                     />
                     <button type="button" onClick={() => setShowConfirm(v => !v)}
-                      aria-label={showConfirm ? 'Ocultar confirmação de senha' : 'Mostrar confirmação de senha'}
+                      aria-label={showConfirm ? t.hideConfirmAria : t.showConfirmAria}
                       aria-pressed={showConfirm}
                       className={`absolute right-3 top-1/2 -translate-y-1/2 ${eyeBtn} transition text-xs`}>
                       <span aria-hidden="true">{showConfirm ? '🙈' : '👁'}</span>
@@ -493,7 +496,7 @@ export default function LoginPage() {
                   >
                     <span className="flex items-center gap-2">
                       <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
-                      Personalizar experiência <span className={`text-[10px] font-normal ${dark ? 'text-white/35' : 'text-slate-400'}`}>(opcional)</span>
+                      {t.personalizeSection} <span className={`text-[10px] font-normal ${dark ? 'text-white/35' : 'text-slate-400'}`}>{t.optionalLabel}</span>
                     </span>
                     <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
                       style={{ transform: showA11y ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .2s' }}>
@@ -508,20 +511,20 @@ export default function LoginPage() {
                           <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
                         </svg>
                         <p className="text-xs font-medium leading-relaxed">
-                          Estas preferências são salvas no seu dispositivo e podem ser alteradas a qualquer momento.
+                          {t.a11yInfo}
                         </p>
                       </div>
 
                       {/* Visão */}
                       <fieldset className="mb-3">
-                        <legend className={`text-[10px] font-bold uppercase tracking-widest ${dark ? 'text-white/55' : 'text-slate-500'} mb-2`}>Visão</legend>
+                        <legend className={`text-[10px] font-bold uppercase tracking-widest ${dark ? 'text-white/55' : 'text-slate-500'} mb-2`}>{t.a11yVision}</legend>
                         <div className="flex flex-col gap-1.5">
                           {([
-                            { key: 'highContrast',     label: 'Alto contraste' },
-                            { key: 'darkMode',         label: 'Modo escuro' },
-                            { key: 'largeFont',        label: 'Fonte maior' },
-                            { key: 'reduceMotion',     label: 'Reduzir animações' },
-                            { key: 'screenReaderMode', label: 'Otimizado para leitor de tela' },
+                            { key: 'highContrast',     label: t.a11yHighContrast },
+                            { key: 'darkMode',         label: t.a11yDarkModeLabel },
+                            { key: 'largeFont',        label: t.a11yLargeFont },
+                            { key: 'reduceMotion',     label: t.a11yReduceMotion },
+                            { key: 'screenReaderMode', label: t.a11yScreenReader },
                           ] as const).map(({ key, label }) => (
                             <label key={key} className={`flex items-center gap-2.5 text-xs cursor-pointer ${dark ? 'text-white/80' : 'text-slate-700'}`}>
                               <input type="checkbox" checked={prefs[key]}
@@ -535,11 +538,11 @@ export default function LoginPage() {
 
                       {/* Mobilidade */}
                       <fieldset className="mb-3">
-                        <legend className={`text-[10px] font-bold uppercase tracking-widest ${dark ? 'text-white/55' : 'text-slate-500'} mb-2`}>Mobilidade</legend>
+                        <legend className={`text-[10px] font-bold uppercase tracking-widest ${dark ? 'text-white/55' : 'text-slate-500'} mb-2`}>{t.a11yMobility}</legend>
                         <div className="flex flex-col gap-1.5">
                           {([
-                            { key: 'keyboardNav',    label: 'Navegação por teclado avançada' },
-                            { key: 'largerTargets',  label: 'Alvos de clique maiores (44px)' },
+                            { key: 'keyboardNav',   label: t.a11yKeyboardNav },
+                            { key: 'largerTargets', label: t.a11yLargerTargets },
                           ] as const).map(({ key, label }) => (
                             <label key={key} className={`flex items-center gap-2.5 text-xs cursor-pointer ${dark ? 'text-white/80' : 'text-slate-700'}`}>
                               <input type="checkbox" checked={prefs[key]}
@@ -553,11 +556,11 @@ export default function LoginPage() {
 
                       {/* Cognição / Foco */}
                       <fieldset className="mb-3">
-                        <legend className={`text-[10px] font-bold uppercase tracking-widest ${dark ? 'text-white/55' : 'text-slate-500'} mb-2`}>Cognição / Foco</legend>
+                        <legend className={`text-[10px] font-bold uppercase tracking-widest ${dark ? 'text-white/55' : 'text-slate-500'} mb-2`}>{t.a11yCognition}</legend>
                         <div className="flex flex-col gap-1.5">
                           {([
-                            { key: 'simplifiedUI', label: 'Interface simplificada' },
-                            { key: 'focusMode',    label: 'Modo foco — menos distrações' },
+                            { key: 'simplifiedUI', label: t.a11ySimplified },
+                            { key: 'focusMode',    label: t.a11yFocusMode },
                           ] as const).map(({ key, label }) => (
                             <label key={key} className={`flex items-center gap-2.5 text-xs cursor-pointer ${dark ? 'text-white/80' : 'text-slate-700'}`}>
                               <input type="checkbox" checked={prefs[key]}
@@ -571,15 +574,15 @@ export default function LoginPage() {
 
                       {/* Comunicação */}
                       <fieldset>
-                        <legend className={`text-[10px] font-bold uppercase tracking-widest ${dark ? 'text-white/55' : 'text-slate-500'} mb-2`}>Comunicação</legend>
+                        <legend className={`text-[10px] font-bold uppercase tracking-widest ${dark ? 'text-white/55' : 'text-slate-500'} mb-2`}>{t.a11yCommunication}</legend>
                         <div className="flex flex-col gap-2">
                           <label className={`flex items-center gap-2.5 text-xs cursor-pointer ${dark ? 'text-white/80' : 'text-slate-700'}`}>
                             <input type="checkbox" checked={prefs.speechMode}
-                              onChange={() => togglePref('speechMode', 'Leitura em voz alta')}
+                              onChange={() => togglePref('speechMode', t.a11ySpeech)}
                               className="w-3.5 h-3.5 rounded accent-violet-600 cursor-pointer" />
                             <span className="flex items-center gap-1.5">
                               <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
-                              Leitura em voz alta (áudio)
+                              {t.a11ySpeech}
                             </span>
                           </label>
                         </div>
