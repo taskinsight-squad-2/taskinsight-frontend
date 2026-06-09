@@ -7,7 +7,6 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { adminService, ApiError } from '@/services/admin.service'
-import { triggerVLibras } from '@/components/VLibras'
 import { useA11yPrefs } from '@/hooks/useA11yPrefs'
 import { type Locale } from '@/lib/i18n'
 import type { Task } from '@/types/task'
@@ -62,6 +61,7 @@ export default function AdminPage() {
   const router = useRouter()
   const { prefs, set: setPrefs } = useA11yPrefs()
   const dark = prefs.darkMode
+
 
   const [tasks,        setTasks]        = useState<Task[]>([])
   const [users,        setUsers]        = useState<User[]>([])
@@ -421,16 +421,7 @@ export default function AdminPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <button onClick={triggerVLibras} aria-label="VLibras — Intérprete de Libras"
-            className="h-8 px-2.5 flex items-center gap-1.5 rounded-lg hover:opacity-90 active:scale-95 transition-all"
-            style={{ backgroundColor: '#1351B4' }}>
-            <svg aria-hidden width="15" height="15" viewBox="0 0 64 64" fill="white">
-              <path d="M48 6c0-2.2-1.8-4-4-4s-4 1.8-4 4v20h-2V4c0-2.2-1.8-4-4-4s-4 1.8-4 4v22h-2V8c0-2.2-1.8-4-4-4S26 5.8 26 8v24h-2v-14c0-2.2-1.8-4-4-4s-4 1.8-4 4v18c0 14.4 9.6 22 24 22s22-8 22-22V18c0-2.2-1.8-4-4-4s-4 1.8-4 4v-12z"/>
-            </svg>
-            <span className="text-white text-[11px] font-bold tracking-wide">VLibras</span>
-          </button>
-
-          <button onClick={() => setPrefs('darkMode', !dark)}
+<button onClick={() => setPrefs('darkMode', !dark)}
             aria-label={dark ? 'Ativar modo claro' : 'Ativar modo escuro'}
             className={`h-8 px-3 flex items-center gap-1.5 rounded-lg border ${ctrlBg} hover:opacity-80 transition text-xs font-semibold`}>
             {dark ? '☀' : '🌙'}

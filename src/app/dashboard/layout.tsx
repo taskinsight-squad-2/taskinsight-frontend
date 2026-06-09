@@ -7,9 +7,11 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <Suspense fallback={null}>
-      {children}
+    <>
+      <Suspense fallback={null}>
+        {children}
+      </Suspense>
       <VLibras />
-    </Suspense>
+    </>
   );
 }

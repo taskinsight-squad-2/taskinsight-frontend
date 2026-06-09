@@ -7,15 +7,16 @@ import { translations, type Locale } from '@/lib/i18n'
 import { taskService } from '@/services/task.service'
 import { analyticsApi } from '@/services/analytics.service'
 import type { Task as ApiTask } from '@/types/task'
-import { triggerVLibras } from '@/components/VLibras'
 import { useA11yPrefs } from '@/hooks/useA11yPrefs'
 import type { Priority, Status, FilterTab, SortMode, AnalyticsResult, TaskDates } from '@/types/dashboard'
 import { mapStatus, mapPriority, today, fmt } from '@/lib/dashboard-utils'
+import { speak } from '@/lib/speak'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { useDashboardTheme } from '@/hooks/useDashboardTheme'
 import { NewTaskModal } from '@/components/dashboard/NewTaskModal'
 import { DeadlineModal } from '@/components/dashboard/DeadlineModal'
 import { ConfirmStartModal } from '@/components/dashboard/ConfirmStartModal'
+import { PersonalizeModal } from '@/components/dashboard/PersonalizeModal'
 import { TaskItem } from '@/components/dashboard/TaskItem'
 import { ProgressChart } from '@/components/dashboard/ProgressChart'
 import { Analytics } from '@/components/dashboard/Analytics'
@@ -66,6 +67,7 @@ function DashboardPage() {
   const [showExpandTooltip, setShowExpandTooltip] = useState(false)
   const sidebarCollapsedRef = useRef(sidebarCollapsed)
   useEffect(() => { sidebarCollapsedRef.current = sidebarCollapsed }, [sidebarCollapsed])
+
 
   // Expand via window capture — bypassa qualquer CSS ou z-index bloqueando o botão
   useEffect(() => {
@@ -179,10 +181,11 @@ function DashboardPage() {
 
   function showToast(msg: string) {
     setToastMsg(msg)
+    if (prefs.speechMode) speak(msg.replace(/^[✓⚠]\s*/, ''))
     setTimeout(() => setToastMsg(''), 3000)
   }
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? undefined : undefined
+const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? undefined : undefined
 
   const [confirmStartId, setConfirmStartId] = useState<string | null>(null)
 
@@ -190,6 +193,7 @@ function DashboardPage() {
     setConfirmStartId(null)
     await taskService.update(id, { status: 'IN_PROGRESS' }, token).catch(() => {})
     await fetchTasks()
+    if (prefs.speechMode) speak('Tarefa iniciada')
   }
   async function finishTask(id: string) {
     const dates = taskDates[id]
@@ -197,11 +201,13 @@ function DashboardPage() {
     setTaskStatuses(prev => ({ ...prev, [id]: 'Done' }))
     setTaskDates(prev => ({ ...prev, [id]: { ...prev[id], finished: today() } }))
     await taskService.update(id, { status: 'DONE' }, token).catch(() => {})
+    if (prefs.speechMode) speak('Tarefa concluída')
   }
   async function reopenTask(id: string) {
     setTaskStatuses(prev => ({ ...prev, [id]: 'InProgress' }))
     setTaskDates(prev => ({ ...prev, [id]: { ...prev[id], finished: null } }))
     await taskService.update(id, { status: 'IN_PROGRESS' }, token).catch(() => {})
+    if (prefs.speechMode) speak('Tarefa reaberta')
   }
   async function saveDeadline(id: string) {
     const val = deadlineDraft[id] ?? ''
@@ -261,6 +267,7 @@ function DashboardPage() {
   }
 
   // ── criar tarefa ─────────────────────────────────────────────────
+  const [showPersonalizeModal, setShowPersonalizeModal] = useState(false)
   const [showNewTask, setShowNewTask] = useState(false)
   const [newTaskForm, setNewTaskForm] = useState({ title: '', description: '', priority: 'MEDIUM' as ApiTask['priority'] })
   const [savingTask, setSavingTask]   = useState(false)
@@ -362,6 +369,11 @@ function DashboardPage() {
   return (
     <div className={`min-h-screen flex ${pageBg} ${text} transition-colors duration-300`}>
 
+      {/* modal personalizar experiência */}
+      {showPersonalizeModal && (
+        <PersonalizeModal onClose={() => setShowPersonalizeModal(false)} />
+      )}
+
       {/* modal nova tarefa */}
       {showNewTask && (
         <NewTaskModal
@@ -434,6 +446,7 @@ function DashboardPage() {
         userInitials={userInitials}
         userName={userName}
         handleLogout={handleLogout}
+        onPersonalize={() => setShowPersonalizeModal(true)}
         t={{ menu: t.menu, categories: t.categories, freePlan: t.freePlan, signOut: t.signOut }}
       />
 
@@ -456,19 +469,7 @@ function DashboardPage() {
             </div>
           </div>
           <div className="relative flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-            <button
-              onClick={triggerVLibras}
-              aria-label="VLibras — Intérprete de Libras"
-              title="VLibras"
-              className="h-8 px-2 sm:px-2.5 flex items-center gap-1.5 rounded-lg hover:opacity-90 active:scale-95 transition-all"
-              style={{ backgroundColor: '#1351B4' }}
-            >
-              <svg aria-hidden="true" width="15" height="15" viewBox="0 0 64 64" fill="white">
-                <path d="M48 6c0-2.2-1.8-4-4-4s-4 1.8-4 4v20h-2V4c0-2.2-1.8-4-4-4s-4 1.8-4 4v22h-2V8c0-2.2-1.8-4-4-4S26 5.8 26 8v24h-2v-14c0-2.2-1.8-4-4-4s-4 1.8-4 4v18c0 14.4 9.6 22 24 22s22-8 22-22V18c0-2.2-1.8-4-4-4s-4 1.8-4 4v-12z"/>
-              </svg>
-              <span className="text-white text-[11px] font-bold tracking-wide hidden sm:inline">VLibras</span>
-            </button>
-            <select value={locale} onChange={e => setLocale(e.target.value as Locale)}
+<select value={locale} onChange={e => setLocale(e.target.value as Locale)}
               style={{ backgroundColor: dark ? '#0D1117' : undefined }}
               className={`text-xs font-semibold px-2 py-1.5 rounded-lg border ${ctrlBg} outline-none cursor-pointer hover:opacity-80 transition hidden sm:block`}>
               <option style={{ backgroundColor: dark ? '#0D1117' : 'white' }} value="pt">PT-BR</option>
@@ -544,7 +545,7 @@ function DashboardPage() {
           {/* ── Task list ── */}
           <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
             {/* toolbar */}
-            <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between px-3 sm:px-5 py-3 border-b ${listBdr} gap-2`}>
+            <div className={`flex flex-row flex-wrap items-center justify-between px-3 sm:px-5 py-3 border-b ${listBdr} gap-2`}>
               <div className={`flex ${filterBg} border rounded-xl p-1 gap-1 overflow-x-auto`} style={{ scrollbarWidth: 'none' }}>
                 {filterTabs.map(f => (
                   <button key={f.key} onClick={() => setFilterReset(f.key)}

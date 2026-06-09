@@ -106,6 +106,12 @@ body {
 .animate-float { animation: float 4s ease-in-out infinite; }
 .animate-pulse-ring { animation: pulse-ring 2.5s ease-in-out infinite; }
 
+/* ── VLibras — botão e painel acima de qualquer elemento do app ── */
+[vw-access-button],
+[vw-plugin-wrapper] {
+  z-index: 10000 !important;
+}
+
 /* ── Preferências de acessibilidade ────────────────────────────── */
 
 /* Fonte ampliada */

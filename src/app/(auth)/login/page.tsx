@@ -5,15 +5,7 @@ import { useRouter } from 'next/navigation'
 import { translations, type Locale } from '@/lib/i18n'
 import { authService } from '@/services/auth.service'
 import { useA11yPrefs } from '@/hooks/useA11yPrefs'
-
-function speak(text: string) {
-  if (typeof window === 'undefined' || !window.speechSynthesis) return
-  window.speechSynthesis.cancel()
-  const u = new SpeechSynthesisUtterance(text)
-  u.lang = 'pt-BR'
-  u.rate = 0.9
-  window.speechSynthesis.speak(u)
-}
+import { speak } from '@/lib/speak'
 
 export default function LoginPage() {
   const router = useRouter()

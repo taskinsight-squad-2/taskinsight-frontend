@@ -41,6 +41,7 @@ export interface SidebarProps {
   userInitials: string
   userName: string
   handleLogout: () => void
+  onPersonalize: () => void
   t: SidebarTranslations
 }
 
@@ -49,7 +50,7 @@ export function Sidebar({
   sidebarOpen, setSidebarOpen,
   navItems, sortMode, setSortMode,
   priorityFilter, setPriorityFilter, categories, tasksCount,
-  userInitials, userName, handleLogout, t,
+  userInitials, userName, handleLogout, onPersonalize, t,
 }: SidebarProps) {
   const text       = dark ? 'text-white'      : 'text-slate-900'
   const sectionLbl = dark ? 'text-white/55'   : 'text-slate-500'
@@ -158,6 +159,24 @@ export function Sidebar({
               })}
             </>
           )}
+
+          {/* Personalizar experiência */}
+          <div className="mt-auto pt-3" style={{ borderTop: `1px solid ${borderColor}`, marginTop: 'auto' }}>
+            <button
+              onClick={onPersonalize}
+              title={collapsed ? 'Personalizar experiência' : undefined}
+              aria-label="Personalizar experiência de acessibilidade"
+              className={`flex items-center rounded-xl text-sm font-medium transition-all w-full ${collapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5 text-left'} ${navInact}`}
+            >
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
+                <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
+                <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
+                <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>
+              </svg>
+              {!collapsed && <span className="flex-1">Personalizar experiência</span>}
+            </button>
+          </div>
         </nav>
 
         <div className={`border-t flex items-center p-4 gap-3 ${collapsed ? 'justify-center' : ''}`} style={{ borderColor }}>
@@ -240,6 +259,23 @@ export function Sidebar({
                   </button>
                 )
               })}
+
+              {/* Personalizar experiência */}
+              <div className="mt-auto pt-3" style={{ borderTop: `1px solid ${borderColor}` }}>
+                <button
+                  onClick={() => { onPersonalize(); setSidebarOpen(false) }}
+                  aria-label="Personalizar experiência de acessibilidade"
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all w-full text-left ${navInact}`}
+                >
+                  <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
+                    <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
+                    <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
+                    <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>
+                  </svg>
+                  <span className="flex-1">Personalizar experiência</span>
+                </button>
+              </div>
             </nav>
 
             {/* Footer */}
