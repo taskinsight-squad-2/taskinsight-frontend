@@ -4,10 +4,12 @@ import React, { useState, useMemo, useEffect } from 'react'
 import type { Task as ApiTask } from '@/types/task'
 import type { DashboardTheme } from '@/hooks/useDashboardTheme'
 import { today } from '@/lib/dashboard-utils'
+import { translations, type Locale } from '@/lib/i18n'
 
 interface ProgressChartProps {
   dark: boolean
   isClient: boolean
+  locale: Locale
   apiTasks: ApiTask[]
   taskDates: Record<string, { created: string; started: string | null; finished: string | null; deadline: string | null; originalDeadline: string | null }>
   taskStatuses: Record<string, 'Pending' | 'InProgress' | 'Done'>
@@ -15,10 +17,9 @@ interface ProgressChartProps {
   theme: DashboardTheme
 }
 
-const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
-
-export function ProgressChart({ dark, isClient, apiTasks, taskDates, taskStatuses, total, theme }: ProgressChartProps) {
+export function ProgressChart({ dark, isClient, locale, apiTasks, taskDates, taskStatuses, total, theme }: ProgressChartProps) {
   const { text, textFaint, cardBg } = theme
+  const t = translations[locale]
 
   const [chartMonth, setChartMonth] = useState<{ year: number; month: number }>({ year: 0, month: 0 })
   const [chartWeek, setChartWeek] = useState<number>(0)
@@ -81,8 +82,8 @@ export function ProgressChart({ dark, isClient, apiTasks, taskDates, taskStatuse
   }, [apiTasks])
 
   const weekLabel = !isClient
-    ? 'Semana 1 — Janeiro 2025'
-    : `Semana ${chartWeek} — ${monthNames[chartMonth.month]} ${chartMonth.year}`
+    ? t.weekLabelFn(1, t.months[0], 2025)
+    : t.weekLabelFn(chartWeek, t.months[chartMonth.month], chartMonth.year)
 
   // ── dados dos gráficos ─────────────────────────────────────────
   const chartData = useMemo(() => {
@@ -113,7 +114,7 @@ export function ProgressChart({ dark, isClient, apiTasks, taskDates, taskStatuse
   const chartLabels    = chartData?.labels   ?? Array(7).fill('')
   const gMax = Math.max(...plannedSeries, ...doneSeries, ...progressSeries, total, 1)
   function gx(i: number) { return GP + i * ((GW - GP * 2) / Math.max(1, nPoints - 1)) }
-  function gy(v: number) { return GH - GP - Math.round(((v - 1) / Math.max(1, gMax - 1)) * (GH - GP * 2)) }
+  function gy(v: number) { return GH - GP - Math.round((v / Math.max(1, gMax)) * (GH - GP * 2)) }
   function makePath(series: number[]) {
     return series.map((v, i) => {
       if (i === 0) return `M ${gx(i)} ${gy(v)}`
@@ -141,14 +142,14 @@ export function ProgressChart({ dark, isClient, apiTasks, taskDates, taskStatuse
         {/* linha 1: título + legenda */}
         <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
           <div>
-            <p className={`text-sm font-semibold ${text}`}>Progresso das Tarefas</p>
-            <p className={`text-xs ${textFaint} mt-0.5`}>Concluídas vs. previsto ao longo do tempo</p>
+            <p className={`text-sm font-semibold ${text}`}>{t.chartTitle}</p>
+            <p className={`text-xs ${textFaint} mt-0.5`}>{t.chartSubtitle}</p>
           </div>
           <div className="flex items-center gap-3 sm:gap-5 flex-wrap">
             {[
-              { color: '#10b981', label: 'Concluídas', dash: false },
-              { color: '#6366f1', label: 'Em andamento', dash: false },
-              { color: dark ? 'rgba(255,255,255,.35)' : 'rgba(100,116,139,.55)', label: 'Previsto', dash: true },
+              { color: '#10b981', label: t.sDonePlural, dash: false },
+              { color: '#6366f1', label: t.sInProgress, dash: false },
+              { color: dark ? 'rgba(255,255,255,.35)' : 'rgba(100,116,139,.55)', label: t.forecastLabel, dash: true },
             ].map(l => (
               <div key={l.label} className="flex items-center gap-1.5">
                 <svg width="22" height="8" className="flex-shrink-0">
@@ -164,12 +165,12 @@ export function ProgressChart({ dark, isClient, apiTasks, taskDates, taskStatuse
         {/* linha 2: navegação semana + filtro mês */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2">
-            <button onClick={prevWeek} aria-label="Semana anterior"
+            <button onClick={prevWeek} aria-label={t.prevBtn}
               className={`w-6 h-6 flex items-center justify-center rounded-lg border ${dark ? 'border-white/10 text-white/45 hover:bg-white/8 hover:text-white/75' : 'border-slate-200 text-slate-400 hover:bg-slate-100 hover:text-slate-700'} transition`}>
               <svg aria-hidden="true" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
             </button>
             <span aria-live="polite" aria-atomic="true" suppressHydrationWarning className={`text-xs font-semibold ${text} min-w-[180px] text-center`}>{weekLabel}</span>
-            <button onClick={nextWeek} aria-label="Próxima semana"
+            <button onClick={nextWeek} aria-label={t.nextBtn}
               className={`w-6 h-6 flex items-center justify-center rounded-lg border ${dark ? 'border-white/10 text-white/45 hover:bg-white/8 hover:text-white/75' : 'border-slate-200 text-slate-400 hover:bg-slate-100 hover:text-slate-700'} transition`}>
               <svg aria-hidden="true" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
@@ -180,7 +181,7 @@ export function ProgressChart({ dark, isClient, apiTasks, taskDates, taskStatuse
               onChange={e => { setChartMonth(prev => ({ ...prev, month: Number(e.target.value) })); setChartWeek(1) }}
               style={{ backgroundColor: dark ? '#0D1117' : undefined }}
               className={`text-xs font-medium px-2.5 py-1.5 rounded-lg border outline-none cursor-pointer ${dark ? 'border-white/10 text-white/65' : 'bg-white border-slate-200 text-slate-600'} transition`}>
-              {monthNames.map((name, i) => (
+              {t.months.map((name, i) => (
                 <option key={i} value={i} style={{ backgroundColor: dark ? '#0D1117' : 'white' }}>{name}</option>
               ))}
             </select>
@@ -200,9 +201,9 @@ export function ProgressChart({ dark, isClient, apiTasks, taskDates, taskStatuse
       {/* Tabela de dados oculta visualmente — acessível para leitores de tela */}
       <div className="sr-only">
         <table>
-          <caption suppressHydrationWarning>Progresso semanal — {weekLabel}</caption>
+          <caption suppressHydrationWarning>{t.chartTitle} — {weekLabel}</caption>
           <thead>
-            <tr><th scope="col">Data</th><th scope="col">Previsto</th><th scope="col">Concluídas</th><th scope="col">Em andamento</th></tr>
+            <tr><th scope="col">Data</th><th scope="col">{t.forecastLabel}</th><th scope="col">{t.sDonePlural}</th><th scope="col">{t.sInProgress}</th></tr>
           </thead>
           <tbody>
             {chartLabels.map((lbl, i) => (
@@ -227,10 +228,10 @@ export function ProgressChart({ dark, isClient, apiTasks, taskDates, taskStatuse
           aria-labelledby="chart-title chart-desc"
           onMouseLeave={() => setChartHoverIdx(null)}
         >
-          <title id="chart-title">Gráfico de progresso — {weekLabel}</title>
+          <title id="chart-title">{t.chartTitle} — {weekLabel}</title>
           <desc id="chart-desc">
-            Linha de tarefas concluídas, em andamento e previsto por dia da semana.
-            {doneSeries[doneSeries.length - 1]} concluídas e {progressSeries[progressSeries.length - 1]} em andamento no último dia visível.
+            {t.sDonePlural}, {t.sInProgress}, {t.forecastLabel}.
+            {doneSeries[doneSeries.length - 1]} {t.sDonePlural.toLowerCase()} {t.sInProgress.toLowerCase()}: {progressSeries[progressSeries.length - 1]}.
           </desc>
           <defs>
             <linearGradient id="gDone" x1="0" y1="0" x2="0" y2="1">
@@ -250,7 +251,7 @@ export function ProgressChart({ dark, isClient, apiTasks, taskDates, taskStatuse
           {/* linhas de grade horizontais + labels eixo Y */}
           {[0, 0.25, 0.5, 0.75, 1].map((f, idx) => {
             const val = Math.round(f * gMax)
-            const yg  = gy(Math.max(1, val === 0 ? 1 : val))
+            const yg  = gy(val)
             return (
               <g key={idx}>
                 <line x1={GP} y1={yg} x2={GW - GP / 2} y2={yg}
@@ -301,7 +302,7 @@ export function ProgressChart({ dark, isClient, apiTasks, taskDates, taskStatuse
 
           {/* pontos concluídas */}
           {doneSeries.map((v, i) => {
-            const cy = v > 0 ? gy(v) : GH - GP
+            const cy = gy(v)
             return (
               <g key={i}>
                 <circle cx={gx(i)} cy={cy} r="8" fill="#10b981" opacity={chartHoverIdx === i ? 0.2 : 0.1} />
@@ -313,7 +314,7 @@ export function ProgressChart({ dark, isClient, apiTasks, taskDates, taskStatuse
 
           {/* pontos andamento */}
           {progressSeries.map((v, i) => {
-            const cy = v > 0 ? gy(v) : GH - GP
+            const cy = gy(v)
             return (
               <g key={i}>
                 <circle cx={gx(i)} cy={cy} r="6.5" fill="#6366f1" opacity={chartHoverIdx === i ? 0.2 : 0.1} />
@@ -367,12 +368,12 @@ export function ProgressChart({ dark, isClient, apiTasks, taskDates, taskStatuse
                 <circle cx={tx2 + 11} cy={ty2 + 29} r="3.5" fill="#10b981" />
                 <text x={tx2 + 20} y={ty2 + 33} fontSize="10"
                   fontFamily="system-ui,sans-serif" fontWeight="500" fill={lbl2}>
-                  Concluídas: {doneSeries[i]}
+                  {t.sDonePlural}: {doneSeries[i]}
                 </text>
                 <circle cx={tx2 + 11} cy={ty2 + 48} r="3.5" fill="#6366f1" />
                 <text x={tx2 + 20} y={ty2 + 52} fontSize="10"
                   fontFamily="system-ui,sans-serif" fontWeight="500" fill={lbl2}>
-                  Andamento: {progressSeries[i]}
+                  {t.statProgress}: {progressSeries[i]}
                 </text>
               </g>
             )
@@ -390,18 +391,18 @@ export function ProgressChart({ dark, isClient, apiTasks, taskDates, taskStatuse
               <div className="flex items-center gap-2.5">
                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${dark ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-emerald-50 border-emerald-200 text-emerald-600'}`}>
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  Adiantado
+                  {t.aheadLabel}
                 </span>
-                <span className={`text-xs ${textFaint}`}>{diff} tarefa{diff !== 1 ? 's' : ''} acima do previsto</span>
+                <span className={`text-xs ${textFaint}`}>{t.aheadMsgFn(diff)}</span>
               </div>
             )
             return (
               <div className="flex items-center gap-2.5">
                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${dark ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-amber-50 border-amber-200 text-amber-600'}`}>
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
-                  Abaixo do previsto
+                  {t.behindLabel}
                 </span>
-                <span className={`text-xs ${textFaint}`}>{Math.abs(diff)} tarefa{Math.abs(diff) !== 1 ? 's' : ''} abaixo do esperado</span>
+                <span className={`text-xs ${textFaint}`}>{t.behindMsgFn(diff)}</span>
               </div>
             )
           })()}
