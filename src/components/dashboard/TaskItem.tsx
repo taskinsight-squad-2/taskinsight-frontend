@@ -97,16 +97,15 @@ export function TaskItem({
   return (
     <li
       className={`border-b last:border-b-0 ${listBdr}`}
-      aria-label={`Tarefa: ${task.title}, status: ${statusConfig[task.status].label}, prioridade: ${task.priority === 'High' ? t.priorityHigh : task.priority === 'Medium' ? t.priorityMedium : t.priorityLow}`}
+      aria-label={`${task.title}, ${task.status === 'Done' ? tl.statusDone : task.status === 'InProgress' ? tl.sInProgress : tl.statusPending}, ${task.priority === 'High' ? t.priorityHigh : task.priority === 'Medium' ? t.priorityMedium : t.priorityLow}`}
     >
       <div className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-5 py-3 sm:py-3.5 ${taskHover} transition group`}>
         {/* status action button */}
         <div className="flex-shrink-0">
           {isDone ? (
-            <button onClick={onReopenTask} title={tl.reopenTitle}
-              className="w-5 h-5 flex items-center justify-center rounded-full bg-emerald-500 text-white hover:bg-amber-500 transition">
+            <span className="w-5 h-5 flex items-center justify-center rounded-full bg-emerald-500 text-white">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            </button>
+            </span>
           ) : isRunning ? (
             <button onClick={onFinishTask} title={tl.finishTitle}
               className="w-5 h-5 flex items-center justify-center rounded-full border-2 border-blue-400 group-hover:bg-blue-500 group-hover:border-blue-500 group-hover:text-white text-blue-400 transition">
@@ -163,7 +162,7 @@ export function TaskItem({
 
         <div className="flex items-center gap-2 flex-shrink-0">
           <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${statusConfig[task.status].color}`}>
-            {statusConfig[task.status].label}
+            {task.status === 'Done' ? tl.statusDone : task.status === 'InProgress' ? tl.sInProgress : tl.statusPending}
           </span>
           {/* chevron accordion */}
           {!description ? (
