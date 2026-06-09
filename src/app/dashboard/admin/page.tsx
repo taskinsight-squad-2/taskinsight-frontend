@@ -8,7 +8,7 @@ import {
 } from 'recharts'
 import { adminService, ApiError } from '@/services/admin.service'
 import { useA11yPrefs } from '@/hooks/useA11yPrefs'
-import { type Locale } from '@/lib/i18n'
+import { translations, type Locale } from '@/lib/i18n'
 import type { Task } from '@/types/task'
 import type { User } from '@/types/user'
 
@@ -76,6 +76,7 @@ export default function AdminPage() {
   const [assigneeFilter, setAssigneeFilter] = useState<string>('ALL')
   const [prodFilter,     setProdFilter]     = useState<'NONE'|'HIGH'|'MED'|'LOW'>('NONE')
   const [locale,         setLocale]         = useState<Locale>('pt')
+  const t = translations[locale]
   const [taskSearch, setTaskSearch] = useState('')
   const [taskPage,   setTaskPage]   = useState(1)
   const TASK_PAGE_SIZE = 12
@@ -354,124 +355,155 @@ export default function AdminPage() {
     ? 'bg-[#0D1117] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white/80 outline-none focus:border-violet-500/60 cursor-pointer'
     : 'bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-violet-400 cursor-pointer'
 
-  // configs estáticas
+  // configs dinâmicas (usam t para tradução)
   const statusCfg: Record<string, { label: string; dot: string; badge: string }> = {
-    PENDING:     { label: 'Não iniciada', dot: 'bg-slate-400',   badge: 'bg-slate-400/10 text-slate-400 border-slate-400/20'      },
-    IN_PROGRESS: { label: 'Em andamento', dot: 'bg-blue-400',    badge: 'bg-blue-400/10 text-blue-400 border-blue-400/20'         },
-    DONE:        { label: 'Concluída',    dot: 'bg-emerald-400', badge: 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20' },
-    CANCELLED:   { label: 'Cancelada',   dot: 'bg-rose-400',    badge: 'bg-rose-400/10 text-rose-400 border-rose-400/20'         },
+    PENDING:     { label: t.sNotStarted,  dot: 'bg-slate-400',   badge: 'bg-slate-400/10 text-slate-400 border-slate-400/20'      },
+    IN_PROGRESS: { label: t.sInProgress,  dot: 'bg-blue-400',    badge: 'bg-blue-400/10 text-blue-400 border-blue-400/20'         },
+    DONE:        { label: t.sDonePlural,  dot: 'bg-emerald-400', badge: 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20' },
+    CANCELLED:   { label: t.sCancelled,  dot: 'bg-rose-400',    badge: 'bg-rose-400/10 text-rose-400 border-rose-400/20'         },
   }
   const priorityCfg: Record<string, { label: string; badge: string }> = {
-    HIGH:   { label: 'Alta',  badge: 'bg-red-400/10 text-red-400 border-red-400/20'             },
-    MEDIUM: { label: 'Média', badge: 'bg-amber-400/10 text-amber-400 border-amber-400/20'       },
-    LOW:    { label: 'Baixa', badge: 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20' },
+    HIGH:   { label: t.priorityHigh,   badge: 'bg-red-400/10 text-red-400 border-red-400/20'             },
+    MEDIUM: { label: t.priorityMedium, badge: 'bg-amber-400/10 text-amber-400 border-amber-400/20'       },
+    LOW:    { label: t.priorityLow,    badge: 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20' },
   }
 
   const summaryCards = [
-    { label: 'Usuários',      value: users.length, accent: 'text-violet-500', bg: 'bg-violet-500/10 border-violet-500/20',
+    { label: t.usersLabel,       value: users.length, accent: 'text-violet-500', bg: 'bg-violet-500/10 border-violet-500/20',
       icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
-    { label: 'Total',         value: totalTasks,   accent: 'text-indigo-500', bg: 'bg-indigo-500/10 border-indigo-500/20',
+    { label: t.totalTasks,       value: totalTasks,   accent: 'text-indigo-500', bg: 'bg-indigo-500/10 border-indigo-500/20',
       icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg> },
-    { label: 'Não iniciadas', value: nNotStarted,  accent: 'text-slate-400',  bg: 'bg-slate-400/10 border-slate-400/20',
+    { label: t.notStartedPlural, value: nNotStarted,  accent: 'text-slate-400',  bg: 'bg-slate-400/10 border-slate-400/20',
       icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> },
-    { label: 'Em andamento',  value: nProgress,    accent: 'text-blue-500',   bg: 'bg-blue-500/10 border-blue-500/20',
+    { label: t.sInProgress,      value: nProgress,    accent: 'text-blue-500',   bg: 'bg-blue-500/10 border-blue-500/20',
       icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> },
-    { label: 'Concluídas',    value: nDone,        accent: 'text-emerald-500',bg: 'bg-emerald-500/10 border-emerald-500/20',
+    { label: t.sDonePlural,      value: nDone,        accent: 'text-emerald-500',bg: 'bg-emerald-500/10 border-emerald-500/20',
       icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> },
-    { label: 'Canceladas',    value: nCancelled,   accent: 'text-rose-500',   bg: 'bg-rose-500/10 border-rose-500/20',
+    { label: t.sCancelled,       value: nCancelled,   accent: 'text-rose-500',   bg: 'bg-rose-500/10 border-rose-500/20',
       icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> },
-    { label: 'Em atraso',     value: nOverdue,     accent: 'text-orange-500', bg: 'bg-orange-500/10 border-orange-500/20',
+    { label: t.sOverdue,         value: nOverdue,     accent: 'text-orange-500', bg: 'bg-orange-500/10 border-orange-500/20',
       icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> },
   ]
 
   const statusTabs = [
-    { key: 'ALL'         as StatusFilter, label: 'Todos',        count: tasks.length },
-    { key: 'PENDING'     as StatusFilter, label: 'Não iniciada', count: nNotStarted  },
-    { key: 'IN_PROGRESS' as StatusFilter, label: 'Em andamento', count: nProgress    },
-    { key: 'DONE'        as StatusFilter, label: 'Concluídas',   count: nDone        },
-    { key: 'CANCELLED'   as StatusFilter, label: 'Canceladas',   count: nCancelled   },
-    { key: 'OVERDUE'     as StatusFilter, label: 'Em atraso',    count: nOverdue     },
+    { key: 'ALL'         as StatusFilter, label: t.sAll,        count: tasks.length },
+    { key: 'PENDING'     as StatusFilter, label: t.sNotStarted, count: nNotStarted  },
+    { key: 'IN_PROGRESS' as StatusFilter, label: t.sInProgress, count: nProgress    },
+    { key: 'DONE'        as StatusFilter, label: t.sDonePlural, count: nDone        },
+    { key: 'CANCELLED'   as StatusFilter, label: t.sCancelled,  count: nCancelled   },
+    { key: 'OVERDUE'     as StatusFilter, label: t.sOverdue,    count: nOverdue     },
   ]
 
   return (
     <div className={`min-h-screen ${pageBg} transition-colors duration-300`}>
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className={`flex items-center justify-between px-6 py-4 border-b ${headerBdr} ${headerBg} backdrop-blur-xl sticky top-0 z-30`}>
-        <div className="flex items-center gap-3">
-          <button onClick={() => router.push('/dashboard')}
-            className={`flex items-center gap-1.5 text-xs font-semibold ${textFaint} transition`}>
-            <svg aria-hidden width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6"/>
-            </svg>
-            Dashboard
-          </button>
-          <span className={`${dark ? 'text-white/15' : 'text-slate-300'} select-none`}>|</span>
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-xl bg-violet-500/15 border border-violet-500/25 flex items-center justify-center">
-              <svg aria-hidden width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-violet-400">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      <header className={`sticky top-0 z-30 border-b ${headerBdr} ${headerBg} backdrop-blur-xl transition-colors duration-300`}>
+
+        {/* Linha 1: navegação + controles primários */}
+        <div className="flex items-center justify-between gap-2 px-3 sm:px-6 py-3 sm:py-4">
+          <div className="flex items-center gap-2 min-w-0">
+            <button onClick={() => router.push('/dashboard')}
+              className={`flex items-center gap-1 text-xs font-semibold ${textFaint} hover:opacity-80 transition flex-shrink-0`}>
+              <svg aria-hidden width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6"/>
               </svg>
-            </div>
-            <div>
-              <h1 className={`text-sm font-bold ${text} leading-tight`}>Painel Administrativo</h1>
-              <p className="text-[10px] text-violet-500 mt-0.5">Visão consolidada de todos os usuários</p>
+              <span className="hidden sm:inline">Dashboard</span>
+            </button>
+            <span className={`${dark ? 'text-white/15' : 'text-slate-300'} select-none flex-shrink-0`}>|</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded-xl bg-violet-500/15 border border-violet-500/25 flex items-center justify-center flex-shrink-0">
+                <svg aria-hidden width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-violet-400">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <h1 className={`text-sm font-bold ${text} leading-tight truncate`}>{t.adminTitle}</h1>
+                <p className="text-[10px] text-violet-500 mt-0.5 hidden sm:block">{t.adminDesc}</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2">
-<button onClick={() => setPrefs('darkMode', !dark)}
-            aria-label={dark ? 'Ativar modo claro' : 'Ativar modo escuro'}
-            className={`h-8 px-3 flex items-center gap-1.5 rounded-lg border ${ctrlBg} hover:opacity-80 transition text-xs font-semibold`}>
-            {dark ? '☀' : '🌙'}
-            <span>{dark ? 'Claro' : 'Escuro'}</span>
-          </button>
-
-          {/* PT / EN toggle */}
-          <div className={`flex items-center h-8 rounded-lg border ${ctrlBg} overflow-hidden text-xs font-bold`}>
-            {(['pt', 'en'] as Locale[]).map((l, i) => (
-              <button key={l}
-                onClick={() => setLocale(l)}
-                aria-label={l === 'pt' ? 'Português' : 'English'}
-                className={`h-full px-2.5 transition-all ${i === 0 ? '' : `border-l ${dark ? 'border-white/10' : 'border-slate-200'}`} ${
-                  locale === l
-                    ? `${dark ? 'bg-white/15 text-white' : 'bg-slate-200 text-slate-800'}`
-                    : `${dark ? 'text-white/40 hover:text-white/70' : 'text-slate-400 hover:text-slate-600'} bg-transparent`
-                }`}>
-                {l.toUpperCase()}
-              </button>
-            ))}
-          </div>
-
-          {/* Atualizar — ícone sem label */}
-          <button onClick={loadData} aria-label="Atualizar dados"
-            className={`h-8 w-8 flex items-center justify-center rounded-lg border ${ctrlBg} hover:opacity-80 transition`}>
-            <svg aria-hidden width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-            </svg>
-          </button>
-
-          <div className={`flex items-center gap-2 ml-1 pl-3 border-l ${headerBdr}`}>
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-[10px] font-bold">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+            {/* sempre: dark mode */}
+            <button onClick={() => setPrefs('darkMode', !dark)}
+              aria-label={dark ? 'Ativar modo claro' : 'Ativar modo escuro'}
+              className={`h-8 w-8 flex items-center justify-center rounded-lg border ${ctrlBg} hover:opacity-80 transition text-sm`}>
+              {dark ? '☀️' : '🌙'}
+            </button>
+            {/* desktop: PT / EN toggle */}
+            <div className={`hidden sm:flex items-center h-8 rounded-lg border ${ctrlBg} overflow-hidden text-xs font-bold`}>
+              {(['pt', 'en'] as Locale[]).map((l, i) => (
+                <button key={l} onClick={() => setLocale(l)}
+                  aria-label={l === 'pt' ? 'Português' : 'English'}
+                  className={`h-full px-2.5 transition-all ${i > 0 ? `border-l ${dark ? 'border-white/10' : 'border-slate-200'}` : ''} ${
+                    locale === l
+                      ? (dark ? 'bg-white/15 text-white' : 'bg-slate-200 text-slate-800')
+                      : (dark ? 'text-white/40 hover:text-white/70' : 'text-slate-400 hover:text-slate-600') + ' bg-transparent'
+                  }`}>
+                  {l === 'pt' ? 'PT' : 'EN'}
+                </button>
+              ))}
+            </div>
+            {/* sempre: atualizar */}
+            <button onClick={loadData} aria-label="Atualizar dados"
+              className={`h-8 w-8 flex items-center justify-center rounded-lg border ${ctrlBg} hover:opacity-80 transition`}>
+              <svg aria-hidden width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+            </button>
+            {/* sempre: avatar */}
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
               {userInitials}
             </div>
-            <div>
+            {/* desktop: nome */}
+            <div className="hidden sm:block">
               <p className={`text-xs font-semibold ${text}`}>{userName}</p>
               <p className="text-[10px] text-violet-400 font-bold tracking-wide">ADMIN</p>
             </div>
+            {/* sempre: Sair */}
+            <button
+              onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('user'); router.replace('/login') }}
+              aria-label="Sair da conta"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 transition flex-shrink-0">
+              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              <span className="hidden sm:inline">{t.signOut}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Linha 2: controles secundários — visível apenas em mobile */}
+        <div className="flex sm:hidden items-center gap-2 px-3 pb-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+          {/* PT/EN toggle */}
+          <div className={`flex items-center h-[30px] rounded-lg border ${ctrlBg} overflow-hidden text-xs font-bold flex-shrink-0`}>
+            {(['pt', 'en'] as Locale[]).map((l, i) => (
+              <button key={l} onClick={() => setLocale(l)}
+                aria-label={l === 'pt' ? 'Português' : 'English'}
+                className={`h-full px-3 transition-all ${i > 0 ? `border-l ${dark ? 'border-white/10' : 'border-slate-200'}` : ''} ${
+                  locale === l
+                    ? (dark ? 'bg-white/15 text-white' : 'bg-slate-200 text-slate-800')
+                    : (dark ? 'text-white/40 hover:text-white/70' : 'text-slate-400 hover:text-slate-600') + ' bg-transparent'
+                }`}>
+                {l === 'pt' ? 'PT' : 'EN'}
+              </button>
+            ))}
+          </div>
+          {/* nome + role */}
+          <div className="flex items-center gap-1.5 ml-auto flex-shrink-0">
+            <span className={`text-xs font-semibold ${text}`}>{userName}</span>
+            <span className="text-[10px] text-violet-400 font-bold tracking-wide">ADMIN</span>
           </div>
         </div>
       </header>
 
       {/* ── Main ───────────────────────────────────────────────────────────── */}
-      <main id="main-content" className="px-6 py-6 flex flex-col gap-5 max-w-[1440px] mx-auto">
+      <main id="main-content" className="px-3 py-4 sm:px-6 sm:py-6 flex flex-col gap-4 sm:gap-5 max-w-[1440px] mx-auto w-full">
 
         {loading && (
           <div role="status" aria-live="polite" className="flex items-center justify-center gap-3 py-28">
             <span aria-hidden className="w-6 h-6 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin"/>
-            <span className="text-sm text-violet-500">Carregando dados do sistema...</span>
+            <span className="text-sm text-violet-500">{t.loadingSystem}</span>
           </div>
         )}
 
@@ -484,7 +516,7 @@ export default function AdminPage() {
             </div>
             <p className="text-red-400 text-sm font-semibold">{error}</p>
             <button onClick={loadData} className="px-5 py-2 rounded-xl text-sm font-semibold text-white bg-violet-600 hover:bg-violet-500 transition">
-              Tentar novamente
+              {t.tryAgain}
             </button>
           </div>
         )}
@@ -517,7 +549,7 @@ export default function AdminPage() {
               <div className={`${cardBg} border rounded-2xl p-5`}>
                 <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
                   <div>
-                    <h2 className={`text-sm font-bold ${text}`}>Evolução de Tarefas</h2>
+                    <h2 className={`text-sm font-bold ${text}`}>{t.evoTitle}</h2>
                     <p className={`text-[11px] ${textFaint} mt-0.5`}>{chartLabel || '—'}</p>
                   </div>
 
@@ -537,7 +569,7 @@ export default function AdminPage() {
                       <button onClick={() => setChartWeek(0)} aria-pressed={chartWeek === 0}
                         className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
                           chartWeek === 0 ? 'bg-violet-600 text-white shadow-sm' : dark ? 'text-white/55 hover:text-white/80' : 'text-slate-500 hover:text-slate-700'
-                        }`}>Mês</button>
+                        }`}>{t.monthBtn}</button>
                       {Array.from({ length: weeksInMonth > 0 ? weeksInMonth : 4 }, (_, i) => i + 1).map(w => (
                         <button key={w} onClick={() => setChartWeek(w)} aria-pressed={chartWeek === w}
                           className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
@@ -551,10 +583,10 @@ export default function AdminPage() {
                 {/* legenda */}
                 <div className="flex gap-5 mb-3 flex-wrap">
                   {[
-                    { color: '#10b981', label: 'Concluídas',   dashed: false },
-                    { color: '#3b82f6', label: 'Em andamento', dashed: false },
-                    { color: '#f97316', label: 'Em atraso',    dashed: false },
-                    { color: '#7c3aed', label: 'Planejadas',   dashed: true  },
+                    { color: '#10b981', label: t.sDonePlural,  dashed: false },
+                    { color: '#3b82f6', label: t.sInProgress,  dashed: false },
+                    { color: '#f97316', label: t.sOverdue,     dashed: false },
+                    { color: '#7c3aed', label: t.sPlanned,     dashed: true  },
                   ].map(l => (
                     <span key={l.label} className="flex items-center gap-1.5">
                       <span className="inline-flex items-center w-6 h-3 flex-shrink-0">
@@ -617,14 +649,14 @@ export default function AdminPage() {
                   </ResponsiveContainer>
                 ) : (
                   <div className={`flex items-center justify-center h-[240px] ${textFaint} text-sm`}>
-                    Carregando gráfico...
+                    {t.loadingChart}
                   </div>
                 )}
               </div>
             </section>
 
             {/* ── Gráfico 2 + 3 ────────────────────────────────────────────── */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-5">
 
               {/* Carga por Responsável */}
               <section className="lg:col-span-3" aria-label="Carga por responsável">
@@ -633,19 +665,19 @@ export default function AdminPage() {
                   {/* cabeçalho */}
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
-                      <h2 className={`text-sm font-bold ${text}`}>Carga por Responsável</h2>
+                      <h2 className={`text-sm font-bold ${text}`}>{t.workloadTitle}</h2>
                       <p className={`text-[11px] ${textFaint} mt-0.5`}>
-                        Top {userChartData.length} por atividade · concluídas + em andamento + em atraso
+                        {t.topActivity(userChartData.length)}
                       </p>
                     </div>
                     {/* métricas globais */}
                     <div className="flex items-center gap-3">
                       <div className={`flex flex-col items-end px-3 py-2 rounded-xl border ${dark ? 'border-white/8 bg-white/[0.03]' : 'border-slate-100 bg-slate-50'}`}>
-                        <span className={`text-[10px] font-semibold ${textFaint} uppercase tracking-widest`}>Produtividade</span>
+                        <span className={`text-[10px] font-semibold ${textFaint} uppercase tracking-widest`}>{t.productivityLbl}</span>
                         <span className={`text-lg font-black tabular-nums ${doneRate >= 70 ? 'text-emerald-400' : doneRate >= 40 ? 'text-amber-400' : 'text-red-400'}`}>{doneRate}%</span>
                       </div>
                       <div className={`flex flex-col items-end px-3 py-2 rounded-xl border ${dark ? 'border-white/8 bg-white/[0.03]' : 'border-slate-100 bg-slate-50'}`}>
-                        <span className={`text-[10px] font-semibold ${textFaint} uppercase tracking-widest`}>T. médio entrega</span>
+                        <span className={`text-[10px] font-semibold ${textFaint} uppercase tracking-widest`}>{t.avgDelivLbl}</span>
                         <span className={`text-lg font-black tabular-nums ${text}`}>
                           {overallAvgDays != null ? `${overallAvgDays}d` : '—'}
                         </span>
@@ -656,11 +688,11 @@ export default function AdminPage() {
                   {/* legenda */}
                   <div className="flex items-center gap-3 flex-wrap">
                     {([
-                      { c: '#64748b', l: 'Não iniciada' },
-                      { c: '#3b82f6', l: 'Andamento'    },
-                      { c: '#f97316', l: 'Em atraso'    },
-                      { c: '#10b981', l: 'Concluídas'   },
-                      { c: '#f43f5e', l: 'Canceladas'   },
+                      { c: '#64748b', l: t.sNotStarted },
+                      { c: '#3b82f6', l: t.sInProgress },
+                      { c: '#f97316', l: t.sOverdue    },
+                      { c: '#10b981', l: t.sDonePlural },
+                      { c: '#f43f5e', l: t.sCancelled  },
                     ] as { c: string; l: string }[]).map(({ c, l }) => (
                       <span key={l} className="flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: c }}/>
@@ -716,19 +748,19 @@ export default function AdminPage() {
                                   ) : null)}
                                   <div style={{ borderTop: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : '#f1f5f9'}`, marginTop: 8, paddingTop: 8 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                                      <span style={{ color: dark ? 'rgba(255,255,255,0.4)' : '#94a3b8', fontSize: 11 }}>Total de tarefas</span>
+                                      <span style={{ color: dark ? 'rgba(255,255,255,0.4)' : '#94a3b8', fontSize: 11 }}>{t.totalTasksLbl}</span>
                                       <span style={{ color: dark ? '#fff' : '#0f172a', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{total}</span>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                                      <span style={{ color: dark ? 'rgba(255,255,255,0.4)' : '#94a3b8', fontSize: 11 }}>Produtividade</span>
+                                      <span style={{ color: dark ? 'rgba(255,255,255,0.4)' : '#94a3b8', fontSize: 11 }}>{t.productivityLbl}</span>
                                       <span style={{ color: (entry?.productivity ?? 0) >= 70 ? '#10b981' : (entry?.productivity ?? 0) >= 40 ? '#f59e0b' : '#f43f5e', fontWeight: 700 }}>
                                         {entry?.productivity ?? 0}%
                                       </span>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                      <span style={{ color: dark ? 'rgba(255,255,255,0.4)' : '#94a3b8', fontSize: 11 }}>Tempo médio</span>
+                                      <span style={{ color: dark ? 'rgba(255,255,255,0.4)' : '#94a3b8', fontSize: 11 }}>{t.avgTimeLbl}</span>
                                       <span style={{ color: dark ? 'rgba(255,255,255,0.8)' : '#475569', fontWeight: 700 }}>
-                                        {entry?.avgDays != null ? `${entry.avgDays} dias` : '—'}
+                                        {entry?.avgDays != null ? `${entry.avgDays} ${t.daysUnit}` : '—'}
                                       </span>
                                     </div>
                                   </div>
@@ -765,7 +797,7 @@ export default function AdminPage() {
                         {/* cabeçalho + filtros */}
                         <div className="flex items-center gap-3 flex-wrap mb-3">
                           <p className={`text-[10px] font-semibold ${textFaint} uppercase tracking-widest shrink-0`}>
-                            Produtividade
+                            {t.productivityLbl}
                           </p>
                           <div className="flex items-center gap-1">
                             <button
@@ -805,14 +837,14 @@ export default function AdminPage() {
                           <>
                             <div className={`grid gap-x-3 text-[10px] font-semibold ${textFaint} uppercase tracking-widest mb-2 px-2`}
                               style={{ gridTemplateColumns: '1fr 52px 140px 72px' }}>
-                              <span>Responsável</span>
-                              <span className="text-right">Tarefas</span>
-                              <span>Entrega</span>
-                              <span className="text-right">T. médio</span>
+                              <span>{t.ownerLbl}</span>
+                              <span className="text-right">{t.tasksTitle}</span>
+                              <span>{t.deliveryLbl}</span>
+                              <span className="text-right">{t.avgTimeSmLbl}</span>
                             </div>
 
                             {filteredUsers.length === 0 ? (
-                              <p className={`text-xs ${textFaint} text-center py-4`}>Nenhum responsável nessa faixa</p>
+                              <p className={`text-xs ${textFaint} text-center py-4`}>{t.noOwnerRange}</p>
                             ) : (
                               <div className="flex flex-col gap-0.5">
                                 {filteredUsers.map(u => {
@@ -844,7 +876,7 @@ export default function AdminPage() {
                             {/* rodapé */}
                             <div className={`grid gap-x-3 items-center mt-2 pt-2 border-t ${dark ? 'border-white/6' : 'border-slate-100'} px-2`}
                               style={{ gridTemplateColumns: '1fr 52px 140px 72px' }}>
-                              <span className={`text-[11px] font-bold ${text}`}>Média geral</span>
+                              <span className={`text-[11px] font-bold ${text}`}>{t.overallAvg}</span>
                               <span className={`text-xs font-bold tabular-nums text-right ${text}`}>{totalTasks}</span>
                               <div className="flex items-center gap-2">
                                 <div className={`flex-1 h-1.5 rounded-full ${dark ? 'bg-white/8' : 'bg-slate-100'} overflow-hidden`}>
@@ -872,8 +904,8 @@ export default function AdminPage() {
               <section className="lg:col-span-2" aria-label="Prioridade por status">
                 <div className={`${cardBg} border rounded-2xl p-5 h-full flex flex-col`}>
                   <div className="mb-5">
-                    <h2 className={`text-sm font-bold ${text}`}>Prioridade × Status</h2>
-                    <p className={`text-[11px] ${textFaint} mt-0.5`}>Distribuição de todas as tarefas</p>
+                    <h2 className={`text-sm font-bold ${text}`}>{t.priorityXStatus}</h2>
+                    <p className={`text-[11px] ${textFaint} mt-0.5`}>{t.priorityDist}</p>
                   </div>
 
                   {/* mini stats por prioridade */}
@@ -893,7 +925,7 @@ export default function AdminPage() {
                             <div className="h-full rounded-full transition-all duration-700"
                               style={{ width: `${rate}%`, backgroundColor: accent.bar }}/>
                           </div>
-                          <p className={`text-[9px] mt-1 ${textFaint}`}>{rate}% concluído</p>
+                          <p className={`text-[9px] mt-1 ${textFaint}`}>{rate}{t.pctDone}</p>
                         </div>
                       )
                     })}
@@ -902,11 +934,11 @@ export default function AdminPage() {
                   {/* legenda */}
                   <div className="flex items-center gap-3 flex-wrap mb-3">
                     {([
-                      { c: '#64748b', l: 'Não iniciada' },
-                      { c: '#3b82f6', l: 'Andamento'    },
-                      { c: '#f97316', l: 'Em atraso'    },
-                      { c: '#10b981', l: 'Concluídas'   },
-                      { c: '#f43f5e', l: 'Canceladas'   },
+                      { c: '#64748b', l: t.sNotStarted },
+                      { c: '#3b82f6', l: t.sInProgress },
+                      { c: '#f97316', l: t.sOverdue    },
+                      { c: '#10b981', l: t.sDonePlural },
+                      { c: '#f43f5e', l: t.sCancelled  },
                     ] as { c: string; l: string }[]).map(({ c, l }) => (
                       <span key={l} className="flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: c }}/>
@@ -946,15 +978,15 @@ export default function AdminPage() {
               <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
 
                 {/* toolbar */}
-                <div className={`px-5 pt-4 pb-3 border-b ${tableBdr}`}>
+                <div className={`px-3 sm:px-5 pt-3 sm:pt-4 pb-3 border-b ${tableBdr}`}>
 
                   {/* título + busca + chip ativo */}
-                  <div className="flex items-center justify-between gap-4 flex-wrap mb-3">
+                  <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
                     <div className="flex items-center gap-2 flex-wrap">
                       <div>
-                        <h2 className={`text-sm font-bold ${text}`}>Tarefas</h2>
+                        <h2 className={`text-sm font-bold ${text}`}>{t.tasksTitle}</h2>
                         <p className={`text-[10px] ${textFaint} mt-0.5`}>
-                          {filteredTasks.length} tarefa{filteredTasks.length !== 1 ? 's' : ''} encontrada{filteredTasks.length !== 1 ? 's' : ''}
+                          {t.foundTasks(filteredTasks.length)}
                         </p>
                       </div>
                       {assigneeFilter !== 'ALL' && userMap[assigneeFilter] && (
@@ -977,14 +1009,14 @@ export default function AdminPage() {
                         className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none ${textFaint}`}>
                         <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
                       </svg>
-                      <input type="search" placeholder="Buscar tarefa..." value={taskSearch}
+                      <input type="search" placeholder={t.searchTask} value={taskSearch}
                         onChange={e => setTaskSearch(e.target.value)}
                         className={`${inputCls} pl-8 w-44`}/>
                     </div>
                   </div>
 
-                  {/* tabs de status + botão Atribuído a */}
-                  <div className={`flex ${dark ? 'bg-white/5 border-white/8' : 'bg-slate-100 border-slate-200'} border rounded-xl p-1 gap-1 flex-wrap mb-3`}>
+                  {/* tabs de status */}
+                  <div className={`flex ${dark ? 'bg-white/5 border-white/8' : 'bg-slate-100 border-slate-200'} border rounded-xl p-1 gap-1 overflow-x-auto mb-3`} style={{ scrollbarWidth: 'none' }}>
                     {statusTabs.map(tab => (
                       <button key={tab.key} onClick={() => setStatusFilter(tab.key)}
                         aria-pressed={statusFilter === tab.key}
@@ -1006,17 +1038,17 @@ export default function AdminPage() {
 
                   {/* Prioridade — botões inline */}
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className={`text-[10px] font-semibold ${textFaint} uppercase tracking-widest mr-1`}>Prioridade:</span>
+                    <span className={`text-[10px] font-semibold ${textFaint} uppercase tracking-widest mr-1`}>{t.priorityHeader}:</span>
                     <button onClick={() => setPriorityFilter('ALL')} aria-pressed={priorityFilter === 'ALL'}
                       className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-all ${
                         priorityFilter === 'ALL'
                           ? dark ? 'bg-white/12 text-white border-white/20' : 'bg-slate-200 text-slate-700 border-slate-300'
                           : dark ? 'border-white/10 text-white/45 hover:text-white/70' : 'border-slate-200 text-slate-400 hover:text-slate-600'
-                      }`}>Todas</button>
+                      }`}>{t.pAll}</button>
                     {([
-                      { key: 'HIGH'   as PriorityFilter, label: 'Alta',  active: 'bg-red-500/15 text-red-400 border-red-500/30',       inactive: dark ? 'border-white/10 text-white/45 hover:border-red-500/30 hover:text-red-400'       : 'border-slate-200 text-slate-400 hover:border-red-300 hover:text-red-500'       },
-                      { key: 'MEDIUM' as PriorityFilter, label: 'Média', active: 'bg-amber-500/15 text-amber-400 border-amber-500/30',  inactive: dark ? 'border-white/10 text-white/45 hover:border-amber-500/30 hover:text-amber-400'  : 'border-slate-200 text-slate-400 hover:border-amber-300 hover:text-amber-500'  },
-                      { key: 'LOW'    as PriorityFilter, label: 'Baixa', active: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30', inactive: dark ? 'border-white/10 text-white/45 hover:border-emerald-500/30 hover:text-emerald-400' : 'border-slate-200 text-slate-400 hover:border-emerald-300 hover:text-emerald-500' },
+                      { key: 'HIGH'   as PriorityFilter, label: t.priorityHigh,   active: 'bg-red-500/15 text-red-400 border-red-500/30',       inactive: dark ? 'border-white/10 text-white/45 hover:border-red-500/30 hover:text-red-400'       : 'border-slate-200 text-slate-400 hover:border-red-300 hover:text-red-500'       },
+                      { key: 'MEDIUM' as PriorityFilter, label: t.priorityMedium, active: 'bg-amber-500/15 text-amber-400 border-amber-500/30',  inactive: dark ? 'border-white/10 text-white/45 hover:border-amber-500/30 hover:text-amber-400'  : 'border-slate-200 text-slate-400 hover:border-amber-300 hover:text-amber-500'  },
+                      { key: 'LOW'    as PriorityFilter, label: t.priorityLow,    active: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30', inactive: dark ? 'border-white/10 text-white/45 hover:border-emerald-500/30 hover:text-emerald-400' : 'border-slate-200 text-slate-400 hover:border-emerald-300 hover:text-emerald-500' },
                     ]).map(p => (
                       <button key={p.key}
                         onClick={() => setPriorityFilter(prev => prev === p.key ? 'ALL' : p.key)}
@@ -1033,7 +1065,7 @@ export default function AdminPage() {
                   <table className="w-full text-left">
                     <thead>
                       <tr className={`border-b ${tableBdr}`}>
-                        {['Título', 'Status', 'Prioridade', 'Atribuído a', 'Prazo', 'Criada em'].map(h => (
+                        {t.tableHeaders.map(h => (
                           <th key={h} scope="col"
                             className={`px-4 py-3 font-semibold uppercase tracking-widest text-[10px] ${textFaint} whitespace-nowrap`}>
                             {h}
@@ -1060,7 +1092,7 @@ export default function AdminPage() {
                                 <span className={`w-1.5 h-1.5 rounded-full ${sc.dot} flex-shrink-0`}/>
                                 {sc.label}
                                 {isOverdue && (
-                                  <span className="ml-1 px-1 rounded text-[9px] font-black bg-orange-500/20 text-orange-400 border border-orange-400/20">ATRASO</span>
+                                  <span className="ml-1 px-1 rounded text-[9px] font-black bg-orange-500/20 text-orange-400 border border-orange-400/20">{t.overdueTag}</span>
                                 )}
                               </span>
                             </td>
@@ -1096,7 +1128,7 @@ export default function AdminPage() {
                       {paginatedTasks.length === 0 && (
                         <tr>
                           <td colSpan={6} className={`px-4 py-14 text-center text-sm ${textFaint}`}>
-                            Nenhuma tarefa encontrada para os filtros selecionados.
+                            {t.noTasksMsg}
                           </td>
                         </tr>
                       )}
@@ -1107,11 +1139,11 @@ export default function AdminPage() {
                 {/* paginação */}
                 {taskTotalPages > 1 && (
                   <div className={`flex items-center justify-between px-5 py-3 border-t ${tableBdr}`}>
-                    <span className={`text-xs ${textFaint}`}>Página {safePage} de {taskTotalPages}</span>
+                    <span className={`text-xs ${textFaint}`}>{t.pageLbl} {safePage} {t.ofLbl} {taskTotalPages}</span>
                     <div className="flex gap-1">
                       <button onClick={() => setTaskPage(p => Math.max(1, p - 1))} disabled={safePage === 1}
                         className={`text-xs px-2.5 py-1 rounded-lg border transition font-medium ${dark ? 'border-white/10 text-white/50 hover:bg-white/5 disabled:opacity-30' : 'border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30'}`}>
-                        ‹ Anterior
+                        {t.prevBtn}
                       </button>
                       {Array.from({ length: Math.min(5, taskTotalPages) }, (_, i) => {
                         const p = safePage <= 3 ? i + 1 : safePage + i - 2
@@ -1125,7 +1157,7 @@ export default function AdminPage() {
                       })}
                       <button onClick={() => setTaskPage(p => Math.min(taskTotalPages, p + 1))} disabled={safePage === taskTotalPages}
                         className={`text-xs px-2.5 py-1 rounded-lg border transition font-medium ${dark ? 'border-white/10 text-white/50 hover:bg-white/5 disabled:opacity-30' : 'border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30'}`}>
-                        Próxima ›
+                        {t.nextBtn}
                       </button>
                     </div>
                   </div>
