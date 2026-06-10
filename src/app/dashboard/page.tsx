@@ -175,12 +175,14 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
     setTaskStatuses(prev => ({ ...prev, [id]: 'Done' }))
     setTaskDates(prev => ({ ...prev, [id]: { ...prev[id], finished: today() } }))
     await taskService.update(id, { status: 'DONE' }, token).catch(() => {})
+    await fetchTasks()
     if (prefs.speechMode) speak('Tarefa concluída')
   }
   async function reopenTask(id: string) {
     setTaskStatuses(prev => ({ ...prev, [id]: 'InProgress' }))
     setTaskDates(prev => ({ ...prev, [id]: { ...prev[id], finished: null } }))
     await taskService.update(id, { status: 'IN_PROGRESS' }, token).catch(() => {})
+    await fetchTasks()
     if (prefs.speechMode) speak('Tarefa reaberta')
   }
   async function saveDeadline(id: string) {
@@ -192,6 +194,7 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
     setTaskDates(prev => ({ ...prev, [id]: { ...prev[id], deadline: val } }))
     setEditingDeadlineId(null)
     await taskService.update(id, { dueDate: isoVal }, token).catch(() => {})
+    await fetchTasks()
     showToast('✓ Prazo salvo!')
   }
 
@@ -212,6 +215,7 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
     setDeadlineChangeReason('')
     setDeadlineDraft(prev => ({ ...prev, [id]: '' }))
     await taskService.update(id, { dueDate: isoVal, deadlineChangeReason: deadlineChangeReason.trim() }, token).catch(() => {})
+    await fetchTasks()
     showToast('✓ Prazo atualizado!')
   }
 
@@ -270,8 +274,20 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
     router.push('/login')
   }
 
-  function completeAll() { setTaskStatuses(prev => Object.fromEntries(Object.keys(prev).map(k => [k, 'Done' as Status]))) }
-  function clearDone()   { setTaskStatuses(prev => Object.fromEntries(Object.entries(prev).filter(([, v]) => v !== 'Done'))) }
+  async function completeAll() {
+    const tk = typeof window !== 'undefined' ? localStorage.getItem('token') ?? undefined : undefined
+    const pending = apiTasks.filter(t => t.status !== 'DONE' && t.status !== 'CANCELLED')
+    setTaskStatuses(prev => {
+      const next = { ...prev }
+      pending.forEach(t => { next[t._id] = 'Done' })
+      return next
+    })
+    await Promise.all(pending.map(t => taskService.update(t._id, { status: 'DONE' }, tk).catch(() => {})))
+    await fetchTasks()
+  }
+  function clearDone() {
+    setTaskStatuses(prev => Object.fromEntries(Object.entries(prev).filter(([, v]) => v !== 'Done')))
+  }
 
   // ── derived data ─────────────────────────────────────────────────
   const tasks = useMemo(() => apiTasks.map(apiTask => ({
@@ -347,6 +363,7 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
       {showNewTask && (
         <NewTaskModal
           dark={dark}
+          locale={locale}
           trapRef={trapNewTask}
           form={newTaskForm}
           setForm={setNewTaskForm}
@@ -598,16 +615,6 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
                   </select>
                   <span className={`text-xs ${textFaint} hidden sm:inline`}>{t.perPage}</span>
                 </div>
-                <button onClick={completeAll} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition ${dark ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  <span className="hidden sm:inline">{t.completeAll}</span>
-                  <span className="sm:hidden">{t.concluirMobile}</span>
-                </button>
-                <button onClick={clearDone} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 transition">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-                  <span className="hidden sm:inline">{t.clearDone}</span>
-                  <span className="sm:hidden">{t.limparMobile}</span>
-                </button>
               </div>
             </div>
 
@@ -671,7 +678,7 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
             {filtered.length > pageSize && (
               <div className={`flex items-center justify-between px-3 sm:px-5 py-3 border-t ${listBdr}`}>
                 <span className={`text-xs ${textFaint}`}>
-                  {(safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, filtered.length)} de {filtered.length}
+                  {(safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, filtered.length)} {t.ofLbl} {filtered.length}
                 </span>
                 <div className="flex items-center gap-1">
                   <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1}
