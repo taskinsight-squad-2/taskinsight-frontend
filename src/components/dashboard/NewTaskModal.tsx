@@ -64,14 +64,25 @@ export function NewTaskModal({ dark, locale, trapRef, form, setForm, saving, onS
           </div>
 
           <div>
-            <label htmlFor="new-task-priority" className={labelCls}>{t.priorityHeader}</label>
-            <select id="new-task-priority" value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value as ApiTask['priority'] }))}
-              style={{ backgroundColor: dark ? '#0D1117' : undefined }}
-              className={dark ? 'w-full bg-[#0D1117] border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-violet-500/60 transition' : 'w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 outline-none focus:border-violet-400 transition'}>
-              <option value="HIGH"   style={{ backgroundColor: dark ? '#0D1117' : 'white' }}>{t.priorityHigh}</option>
-              <option value="MEDIUM" style={{ backgroundColor: dark ? '#0D1117' : 'white' }}>{t.priorityMedium}</option>
-              <option value="LOW"    style={{ backgroundColor: dark ? '#0D1117' : 'white' }}>{t.priorityLow}</option>
-            </select>
+            <span className={labelCls}>{t.priorityHeader}</span>
+            <div className="flex gap-2 mt-1.5" role="group" aria-label={t.priorityHeader}>
+              {([
+                { value: 'HIGH'   as ApiTask['priority'], label: t.priorityHigh,   active: 'bg-red-500/15 border-red-500/40 text-red-400',    inactive: dark ? 'border-white/10 text-white/45 hover:border-red-500/30 hover:text-red-400'       : 'border-slate-200 text-slate-500 hover:border-red-300 hover:text-red-500',    dot: 'bg-red-400'     },
+                { value: 'MEDIUM' as ApiTask['priority'], label: t.priorityMedium, active: 'bg-amber-500/15 border-amber-500/40 text-amber-400', inactive: dark ? 'border-white/10 text-white/45 hover:border-amber-500/30 hover:text-amber-400' : 'border-slate-200 text-slate-500 hover:border-amber-300 hover:text-amber-500', dot: 'bg-amber-400'   },
+                { value: 'LOW'    as ApiTask['priority'], label: t.priorityLow,    active: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400', inactive: dark ? 'border-white/10 text-white/45 hover:border-emerald-500/30 hover:text-emerald-400' : 'border-slate-200 text-slate-500 hover:border-emerald-300 hover:text-emerald-500', dot: 'bg-emerald-400' },
+              ]).map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, priority: opt.value }))}
+                  aria-pressed={form.priority === opt.value}
+                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-semibold transition-all ${form.priority === opt.value ? opt.active : opt.inactive}`}
+                >
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${opt.dot}`} />
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="flex gap-2 justify-end mt-1">

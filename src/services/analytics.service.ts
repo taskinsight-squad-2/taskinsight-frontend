@@ -5,6 +5,7 @@ import {
   ThroughputResponse,
   BacklogResponse,
   ResponseTimeResponse,
+  ResolutionTimeResponse,
 } from "@/types/analytics";
 
 const BASE_URL = process.env.NEXT_PUBLIC_ANALYTICS_API_URL ?? "";
@@ -54,4 +55,7 @@ export const analyticsApi = {
 
   getResponseTime: (token?: string) =>
     fetchMetrics<ResponseTimeResponse>("/task/metrics/response-time", token),
+
+  getResolutionTime: (token?: string) =>
+    fetchMetrics<ResolutionTimeResponse>("/task/metrics/resolution-time", token),
 };

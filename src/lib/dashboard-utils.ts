@@ -4,6 +4,7 @@ import type { Priority, Status } from '@/types/dashboard'
 export function mapStatus(s: ApiTask['status']): Status {
   if (s === 'IN_PROGRESS') return 'InProgress'
   if (s === 'DONE')        return 'Done'
+  if (s === 'CANCELLED')   return 'Cancelled'
   return 'Pending'
 }
 

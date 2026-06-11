@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  AreaChart, Area, BarChart, Bar,
+  BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { adminService, ApiError } from '@/services/admin.service'
@@ -74,7 +74,9 @@ export default function AdminPage() {
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('ALL')
   const [assigneeFilter, setAssigneeFilter] = useState<string>('ALL')
   const [prodFilter,     setProdFilter]     = useState<'NONE'|'HIGH'|'MED'|'LOW'>('NONE')
-  const [locale,         setLocale]         = useState<Locale>('pt')
+  const [locale,         setLocale]         = useState<Locale>(() =>
+    typeof window !== 'undefined' ? (localStorage.getItem('locale') as Locale | null ?? 'pt') : 'pt'
+  )
   const t = translations[locale]
   const [taskSearch, setTaskSearch] = useState('')
   const [taskPage,   setTaskPage]   = useState(1)
@@ -131,12 +133,8 @@ export default function AdminPage() {
     } finally { setLoading(false) }
   }, [])
 
-  useEffect(() => {
-    loadData()
-    const now = new Date()
-    setChartYear(now.getFullYear())
-    setChartMonth(now.getMonth())
-  }, [loadData])
+  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => { localStorage.setItem('locale', locale) }, [locale])
 
   // métricas globais
   const today = todayStr()
@@ -152,12 +150,13 @@ export default function AdminPage() {
   const nProgress   = tasks.filter(t => t.status === 'IN_PROGRESS' && !(t.dueDate && t.dueDate < today)).length
   const doneRate    = totalTasks > 0 ? Math.round(nDone / totalTasks * 100) : 0
 
-  // mapa userId → User (suporta _id e id)
+  // mapa userId → User (indexa por id, _id e qualquer variação retornada pela API)
   const userMap = useMemo(() => {
     const m: Record<string, User> = {}
     users.forEach(u => {
-      const id = uid(u)
-      if (id) m[id] = u
+      const rawU = u as unknown as Record<string, string>
+      const keys = [u.id, rawU._id, rawU.userId].filter(Boolean) as string[]
+      keys.forEach(k => { m[k] = u })
     })
     return m
   }, [users])
@@ -543,365 +542,9 @@ export default function AdminPage() {
               </p>
             </section>
 
-            {/* ── Gráfico de evolução ───────────────────────────────────────── */}
-            <section aria-label="Gráfico de evolução por período">
-              <div className={`${cardBg} border rounded-2xl p-5`}>
-                <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
-                  <div>
-                    <h2 className={`text-sm font-bold ${text}`}>{t.evoTitle}</h2>
-                    <p className={`text-[11px] ${textFaint} mt-0.5`}>{chartLabel || '—'}</p>
-                  </div>
-
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {/* Seletor de mês */}
-                    <select value={chartMonth}
-                      onChange={e => { setChartMonth(Number(e.target.value)); setChartWeek(0) }}
-                      className={selectCls}
-                      aria-label={t.monthSelectAria}>
-                      {t.months.map((m, i) => (
-                        <option key={i} value={i} style={{ backgroundColor: dark ? '#0D1117' : 'white' }}>{m}</option>
-                      ))}
-                    </select>
-
-                    {/* Seletor de semana */}
-                    <div className={`flex ${dark ? 'bg-white/5 border-white/8' : 'bg-slate-100 border-slate-200'} border rounded-xl p-1 gap-1`}>
-                      <button onClick={() => setChartWeek(0)} aria-pressed={chartWeek === 0}
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
-                          chartWeek === 0 ? 'bg-violet-600 text-white shadow-sm' : dark ? 'text-white/55 hover:text-white/80' : 'text-slate-500 hover:text-slate-700'
-                        }`}>{t.monthBtn}</button>
-                      {Array.from({ length: weeksInMonth > 0 ? weeksInMonth : 4 }, (_, i) => i + 1).map(w => (
-                        <button key={w} onClick={() => setChartWeek(w)} aria-pressed={chartWeek === w}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
-                            chartWeek === w ? 'bg-violet-600 text-white shadow-sm' : dark ? 'text-white/55 hover:text-white/80' : 'text-slate-500 hover:text-slate-700'
-                          }`}>S{w}</button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* legenda */}
-                <div className="flex gap-5 mb-3 flex-wrap">
-                  {[
-                    { color: '#10b981', label: t.sDonePlural,  dashed: false },
-                    { color: '#3b82f6', label: t.sInProgress,  dashed: false },
-                    { color: '#f97316', label: t.sOverdue,     dashed: false },
-                    { color: '#7c3aed', label: t.sPlanned,     dashed: true  },
-                  ].map(l => (
-                    <span key={l.label} className="flex items-center gap-1.5">
-                      <span className="inline-flex items-center w-6 h-3 flex-shrink-0">
-                        <svg width="24" height="4">
-                          <line x1="0" y1="2" x2="24" y2="2" stroke={l.color} strokeWidth="2.5"
-                            strokeDasharray={l.dashed ? '5 3' : undefined}/>
-                        </svg>
-                      </span>
-                      <span className={`text-[11px] ${textFaint}`}>{l.label}</span>
-                    </span>
-                  ))}
-                </div>
-
-                {chartMonth >= 0 && chartYear > 0 ? (
-                  <ResponsiveContainer width="100%" height={240}>
-                    <AreaChart data={chartPoints} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="gDone" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%"  stopColor="#10b981" stopOpacity={0.35}/>
-                          <stop offset="95%" stopColor="#10b981" stopOpacity={0.02}/>
-                        </linearGradient>
-                        <linearGradient id="gProg" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%"  stopColor="#3b82f6" stopOpacity={0.28}/>
-                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.02}/>
-                        </linearGradient>
-                        <linearGradient id="gOver" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%"  stopColor="#f97316" stopOpacity={0.45}/>
-                          <stop offset="95%" stopColor="#f97316" stopOpacity={0.02}/>
-                        </linearGradient>
-                        <linearGradient id="gPlan" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%"  stopColor="#7c3aed" stopOpacity={0.12}/>
-                          <stop offset="95%" stopColor="#7c3aed" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke={dark ? '#ffffff08' : '#e2e8f0'} vertical={false}/>
-                      <XAxis dataKey="label"
-                        tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }}
-                        axisLine={false} tickLine={false}/>
-                      <YAxis allowDecimals={false}
-                        tick={{ fill: dark ? '#ffffff55' : '#64748b', fontSize: 10 }}
-                        axisLine={false} tickLine={false}/>
-                      <Tooltip content={<ChartTooltip dark={dark}/>}/>
-                      {/* planejadas — fantasma tracejado */}
-                      <Area type="monotone" dataKey="planejadas" name={t.sPlanned}
-                        stroke="#7c3aed" strokeWidth={1.5} strokeDasharray="5 4"
-                        fill="url(#gPlan)" dot={false} activeDot={{ r: 4 }}/>
-                      {/* em atraso — sombra laranja */}
-                      <Area type="monotone" dataKey="emAtraso" name={t.sOverdue}
-                        stroke="#f97316" strokeWidth={2}
-                        fill="url(#gOver)" dot={false} activeDot={{ r: 4 }}/>
-                      {/* em andamento */}
-                      <Area type="monotone" dataKey="emAndamento" name={t.sInProgress}
-                        stroke="#3b82f6" strokeWidth={2}
-                        fill="url(#gProg)" dot={false} activeDot={{ r: 4 }}/>
-                      {/* concluídas — linha mais grossa */}
-                      <Area type="monotone" dataKey="concluidas" name={t.sDonePlural}
-                        stroke="#10b981" strokeWidth={2.5}
-                        fill="url(#gDone)" dot={false} activeDot={{ r: 4 }}/>
-                    </AreaChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className={`flex items-center justify-center h-[240px] ${textFaint} text-sm`}>
-                    {t.loadingChart}
-                  </div>
-                )}
-              </div>
-            </section>
-
-            {/* ── Gráfico 2 + 3 ────────────────────────────────────────────── */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-5">
-
-              {/* Carga por Responsável */}
-              <section className="lg:col-span-3" aria-label="Carga por responsável">
-                <div className={`${cardBg} border rounded-2xl p-5 flex flex-col gap-4`}>
-
-                  {/* cabeçalho */}
-                  <div className="flex items-start justify-between gap-3 flex-wrap">
-                    <div>
-                      <h2 className={`text-sm font-bold ${text}`}>{t.workloadTitle}</h2>
-                      <p className={`text-[11px] ${textFaint} mt-0.5`}>
-                        {t.topActivity(userChartData.length)}
-                      </p>
-                    </div>
-                    {/* métricas globais */}
-                    <div className="flex items-center gap-3">
-                      <div className={`flex flex-col items-end px-3 py-2 rounded-xl border ${dark ? 'border-white/8 bg-white/[0.03]' : 'border-slate-100 bg-slate-50'}`}>
-                        <span className={`text-[10px] font-semibold ${textFaint} uppercase tracking-widest`}>{t.productivityLbl}</span>
-                        <span className={`text-lg font-black tabular-nums ${doneRate >= 70 ? 'text-emerald-400' : doneRate >= 40 ? 'text-amber-400' : 'text-red-400'}`}>{doneRate}%</span>
-                      </div>
-                      <div className={`flex flex-col items-end px-3 py-2 rounded-xl border ${dark ? 'border-white/8 bg-white/[0.03]' : 'border-slate-100 bg-slate-50'}`}>
-                        <span className={`text-[10px] font-semibold ${textFaint} uppercase tracking-widest`}>{t.avgDelivLbl}</span>
-                        <span className={`text-lg font-black tabular-nums ${text}`}>
-                          {overallAvgDays != null ? `${overallAvgDays}d` : '—'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* legenda */}
-                  <div className="flex items-center gap-3 flex-wrap">
-                    {([
-                      { c: '#64748b', l: t.sNotStarted },
-                      { c: '#3b82f6', l: t.sInProgress },
-                      { c: '#f97316', l: t.sOverdue    },
-                      { c: '#10b981', l: t.sDonePlural },
-                      { c: '#f43f5e', l: t.sCancelled  },
-                    ] as { c: string; l: string }[]).map(({ c, l }) => (
-                      <span key={l} className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: c }}/>
-                        <span className={`text-[10px] font-medium ${textFaint}`}>{l}</span>
-                      </span>
-                    ))}
-                  </div>
-
-                  {/* gráfico de barras */}
-                  {(() => {
-                    const maxTotal = userChartData.length > 0 ? Math.max(...userChartData.map(d => d.total)) : 10
-                    const xMax = Math.ceil(maxTotal / 5) * 5 || 10
-                    const xTicks = Array.from({ length: Math.min(7, Math.ceil(xMax / 5) + 1) }, (_, i) => i * 5)
-                    return (
-                      <ResponsiveContainer width="100%" height={Math.max(200, userChartData.length * 34)}>
-                        <BarChart layout="vertical" data={userChartData}
-                          margin={{ top: 0, right: 8, left: 0, bottom: 0 }} barSize={13}>
-                          <CartesianGrid strokeDasharray="2 4"
-                            stroke={dark ? 'rgba(255,255,255,0.04)' : '#f1f5f9'} horizontal={false}/>
-                          <XAxis type="number" allowDecimals={false}
-                            domain={[0, xMax]} ticks={xTicks}
-                            tickFormatter={v => `${v}`}
-                            tick={{ fill: dark ? 'rgba(255,255,255,0.3)' : '#94a3b8', fontSize: 10 }}
-                            axisLine={false} tickLine={false}
-                            label={{ value: 'tarefas', position: 'insideBottomRight', offset: -4, fontSize: 9, fill: dark ? 'rgba(255,255,255,0.2)' : '#cbd5e1' }}/>
-                          <YAxis type="category" dataKey="name" width={80}
-                            tick={{ fill: dark ? 'rgba(255,255,255,0.65)' : '#334155', fontSize: 11, fontWeight: 500 }}
-                            axisLine={false} tickLine={false}/>
-                          <Tooltip
-                            cursor={{ fill: dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' }}
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            content={({ active, payload, label }: any) => {
-                              if (!active || !payload?.length) return null
-                              const entry = userChartData.find(d => d.name === label)
-                              const total = payload.reduce((s: number, p: { value?: number }) => s + (p.value ?? 0), 0)
-                              return (
-                                <div style={{
-                                  backgroundColor: dark ? '#111827' : '#fff',
-                                  border: `1px solid ${dark ? 'rgba(255,255,255,0.1)' : '#e2e8f0'}`,
-                                  borderRadius: 10, padding: '10px 14px', fontSize: 12,
-                                  boxShadow: dark ? '0 8px 32px rgba(0,0,0,0.6)' : '0 4px 16px rgba(0,0,0,0.1)',
-                                  minWidth: 180,
-                                }}>
-                                  <p style={{ color: dark ? 'rgba(255,255,255,0.9)' : '#1e293b', fontWeight: 700, marginBottom: 8, fontSize: 13 }}>
-                                    {entry?.fullName ?? label}
-                                  </p>
-                                  {payload.map((p: { name?: string; value?: number; fill?: string }, i: number) => p.value ? (
-                                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                                      <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: p.fill, flexShrink: 0 }}/>
-                                      <span style={{ color: dark ? 'rgba(255,255,255,0.55)' : '#64748b', flex: 1 }}>{p.name}</span>
-                                      <span style={{ color: dark ? '#fff' : '#0f172a', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{p.value}</span>
-                                    </div>
-                                  ) : null)}
-                                  <div style={{ borderTop: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : '#f1f5f9'}`, marginTop: 8, paddingTop: 8 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                                      <span style={{ color: dark ? 'rgba(255,255,255,0.4)' : '#94a3b8', fontSize: 11 }}>{t.totalTasksLbl}</span>
-                                      <span style={{ color: dark ? '#fff' : '#0f172a', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{total}</span>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                                      <span style={{ color: dark ? 'rgba(255,255,255,0.4)' : '#94a3b8', fontSize: 11 }}>{t.productivityLbl}</span>
-                                      <span style={{ color: (entry?.productivity ?? 0) >= 70 ? '#10b981' : (entry?.productivity ?? 0) >= 40 ? '#f59e0b' : '#f43f5e', fontWeight: 700 }}>
-                                        {entry?.productivity ?? 0}%
-                                      </span>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                      <span style={{ color: dark ? 'rgba(255,255,255,0.4)' : '#94a3b8', fontSize: 11 }}>{t.avgTimeLbl}</span>
-                                      <span style={{ color: dark ? 'rgba(255,255,255,0.8)' : '#475569', fontWeight: 700 }}>
-                                        {entry?.avgDays != null ? `${entry.avgDays} ${t.daysUnit}` : '—'}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              )
-                            }}
-                          />
-                          <Bar dataKey="Não iniciada" name={t.sNotStarted} stackId="s" fill="#64748b" radius={0}/>
-                          <Bar dataKey="Em andamento" name={t.sInProgress} stackId="s" fill="#3b82f6" radius={0}/>
-                          <Bar dataKey="Em atraso"    name={t.sOverdue}    stackId="s" fill="#f97316" radius={0}/>
-                          <Bar dataKey="Concluídas"   name={t.sDonePlural} stackId="s" fill="#10b981" radius={0}/>
-                          <Bar dataKey="Canceladas"   name={t.sCancelled}  stackId="s" fill="#f43f5e" radius={[0,3,3,0]}/>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    )
-                  })()}
-
-                  {/* produtividade individual — aparece ao selecionar um filtro */}
-                  {(() => {
-                    const PROD_FILTERS = [
-                      { key: 'HIGH', label: '≥ 70%', color: '#10b981', test: (p: number) => p >= 70 },
-                      { key: 'MED',  label: '40–69%', color: '#f59e0b', test: (p: number) => p >= 40 && p < 70 },
-                      { key: 'LOW',  label: '< 40%',  color: '#f43f5e', test: (p: number) => p < 40 },
-                    ] as const
-
-                    const filteredUsers = prodFilter === 'NONE'
-                      ? []
-                      : [...userChartData].reverse().filter(u =>
-                          PROD_FILTERS.find(f => f.key === prodFilter)!.test(u.productivity)
-                        )
-
-                    return (
-                      <div className={`border-t ${dark ? 'border-white/6' : 'border-slate-100'} pt-4`}>
-                        {/* cabeçalho + filtros */}
-                        <div className="flex items-center gap-3 flex-wrap mb-3">
-                          <p className={`text-[10px] font-semibold ${textFaint} uppercase tracking-widest shrink-0`}>
-                            {t.productivityLbl}
-                          </p>
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => setProdFilter('NONE')}
-                              className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition-all ${
-                                prodFilter === 'NONE'
-                                  ? `${dark ? 'bg-white/10 border-white/20 text-white/80' : 'bg-slate-100 border-slate-300 text-slate-600'}`
-                                  : `${dark ? 'border-white/10 text-white/35 hover:text-white/60' : 'border-slate-200 text-slate-300 hover:text-slate-500'} bg-transparent`
-                              }`}>
-                              {t.pAll}
-                            </button>
-                            {PROD_FILTERS.map(f => {
-                              const active = prodFilter === f.key
-                              return (
-                                <button key={f.key}
-                                  onClick={() => setProdFilter(active ? 'NONE' : f.key)}
-                                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition-all ${
-                                    active
-                                      ? 'text-white border-transparent'
-                                      : `${dark ? 'border-white/10 text-white/40 hover:text-white/70' : 'border-slate-200 text-slate-400 hover:text-slate-600'} bg-transparent`
-                                  }`}
-                                  style={active ? { backgroundColor: f.color, borderColor: f.color } : {}}>
-                                  {f.label}
-                                </button>
-                              )
-                            })}
-                          </div>
-                          {prodFilter !== 'NONE' && (
-                            <span className={`text-[10px] ${textFaint} ml-auto`}>
-                              {filteredUsers.length} responsável{filteredUsers.length !== 1 ? 'is' : ''}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* tabela — visível apenas com filtro ativo */}
-                        {prodFilter !== 'NONE' && (
-                          <>
-                            <div className={`grid gap-x-3 text-[10px] font-semibold ${textFaint} uppercase tracking-widest mb-2 px-2`}
-                              style={{ gridTemplateColumns: '1fr 52px 140px 72px' }}>
-                              <span>{t.ownerLbl}</span>
-                              <span className="text-right">{t.tasksTitle}</span>
-                              <span>{t.deliveryLbl}</span>
-                              <span className="text-right">{t.avgTimeSmLbl}</span>
-                            </div>
-
-                            {filteredUsers.length === 0 ? (
-                              <p className={`text-xs ${textFaint} text-center py-4`}>{t.noOwnerRange}</p>
-                            ) : (
-                              <div className="flex flex-col gap-0.5">
-                                {filteredUsers.map(u => {
-                                  const barColor = u.productivity >= 70 ? '#10b981' : u.productivity >= 40 ? '#f59e0b' : '#f43f5e'
-                                  return (
-                                    <div key={u.userId || u.fullName}
-                                      className={`grid gap-x-3 items-center py-1.5 px-2 rounded-lg ${dark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'} transition`}
-                                      style={{ gridTemplateColumns: '1fr 52px 140px 72px' }}>
-                                      <span className={`text-xs font-medium ${text} truncate`} title={u.fullName}>{u.name}</span>
-                                      <span className={`text-xs font-bold tabular-nums text-right ${textMuted}`}>{u.total}</span>
-                                      <div className="flex items-center gap-2">
-                                        <div className={`flex-1 h-1.5 rounded-full ${dark ? 'bg-white/8' : 'bg-slate-100'} overflow-hidden`}>
-                                          <div className="h-full rounded-full transition-all duration-700"
-                                            style={{ width: `${u.productivity}%`, backgroundColor: barColor }}/>
-                                        </div>
-                                        <span className="text-[11px] font-bold tabular-nums w-8 text-right" style={{ color: barColor }}>
-                                          {u.productivity}%
-                                        </span>
-                                      </div>
-                                      <span className={`text-[11px] font-semibold tabular-nums text-right ${u.avgDays != null ? textMuted : textFaint}`}>
-                                        {u.avgDays != null ? `${u.avgDays}d` : '—'}
-                                      </span>
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            )}
-
-                            {/* rodapé */}
-                            <div className={`grid gap-x-3 items-center mt-2 pt-2 border-t ${dark ? 'border-white/6' : 'border-slate-100'} px-2`}
-                              style={{ gridTemplateColumns: '1fr 52px 140px 72px' }}>
-                              <span className={`text-[11px] font-bold ${text}`}>{t.overallAvg}</span>
-                              <span className={`text-xs font-bold tabular-nums text-right ${text}`}>{totalTasks}</span>
-                              <div className="flex items-center gap-2">
-                                <div className={`flex-1 h-1.5 rounded-full ${dark ? 'bg-white/8' : 'bg-slate-100'} overflow-hidden`}>
-                                  <div className="h-full rounded-full transition-all duration-700"
-                                    style={{ width: `${doneRate}%`, backgroundColor: doneRate >= 70 ? '#10b981' : doneRate >= 40 ? '#f59e0b' : '#f43f5e' }}/>
-                                </div>
-                                <span className="text-[11px] font-bold tabular-nums w-8 text-right"
-                                  style={{ color: doneRate >= 70 ? '#10b981' : doneRate >= 40 ? '#f59e0b' : '#f43f5e' }}>
-                                  {doneRate}%
-                                </span>
-                              </div>
-                              <span className={`text-[11px] font-bold tabular-nums text-right ${text}`}>
-                                {overallAvgDays != null ? `${overallAvgDays}d` : '—'}
-                              </span>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    )
-                  })()}
-                </div>
-              </section>
-
-              {/* Prioridade × Status — também horizontal para consistência */}
-              <section className="lg:col-span-2" aria-label="Prioridade por status">
-                <div className={`${cardBg} border rounded-2xl p-5 h-full flex flex-col`}>
+            {/* ── Prioridade × Status ──────────────────────────────────────── */}
+            <section aria-label="Prioridade por status">
+              <div className={`${cardBg} border rounded-2xl p-5 flex flex-col`}>
                   <div className="mb-5">
                     <h2 className={`text-sm font-bold ${text}`}>{t.priorityXStatus}</h2>
                     <p className={`text-[11px] ${textFaint} mt-0.5`}>{t.priorityDist}</p>
@@ -969,8 +612,7 @@ export default function AdminPage() {
                     </ResponsiveContainer>
                   </div>
                 </div>
-              </section>
-            </div>
+            </section>
 
             {/* ── Lista de Tarefas ─────────────────────────────────────────── */}
             <section ref={taskListRef} aria-label="Lista de tarefas">

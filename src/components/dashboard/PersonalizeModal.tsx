@@ -5,10 +5,9 @@ import { useA11yPrefs } from '@/hooks/useA11yPrefs'
 import { speak } from '@/lib/speak'
 import { translations, type Locale } from '@/lib/i18n'
 
-export function PersonalizeModal({ onClose, locale }: { onClose: () => void; locale: Locale }) {
+export function PersonalizeModal({ onClose, locale, dark }: { onClose: () => void; locale: Locale; dark: boolean }) {
   const { prefs, toggle } = useA11yPrefs()
   const t = translations[locale]
-  const dark = prefs.darkMode
   const panelRef = useRef<HTMLDivElement>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
 

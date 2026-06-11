@@ -34,12 +34,14 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
   const [hideOverview, setHideOverview] = useState(false)
   const [hideChart, setHideChart] = useState(false)
   const [hideSla, setHideSla] = useState(false)
+  const [hideResolution, setHideResolution] = useState(false)
 
   const st  = analytics?.status?.data
   const pr  = analytics?.priority?.data
   const atd = analytics?.averageTime?.data
-  const hasThroughput    = (analytics?.throughput?.data.length    ?? 0) > 0
-  const hasResolutionTime = (analytics?.responseTime?.data.length ?? 0) > 0
+  const hasThroughput     = (analytics?.throughput?.data.length     ?? 0) > 0
+  const hasResponseTime   = (analytics?.responseTime?.data.length   ?? 0) > 0
+  const hasResolutionTime = (analytics?.resolutionTime?.data.length ?? 0) > 0
 
   const stMax = st ? Math.max(st.PENDING.count, st.IN_PROGRESS.count, st.DONE.count, st.CANCELLED?.count ?? 0, 1) : 1
   const prMax = pr ? Math.max(pr.HIGH.count, pr.MEDIUM.count, pr.LOW.count, 1) : 1
@@ -177,16 +179,13 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
         </div>
       )}
 
-      {/* ── Resolution Time / SLA 90% ── */}
-      {hasResolutionTime && (
+      {/* ── SLA Atendimento Inicial (response-time) ── */}
+      {hasResponseTime && (
         <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
           <div className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}>
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-base leading-none">⏱</span>
-              <div className="min-w-0">
-                <p className={`text-sm font-semibold ${text}`}>{t.resolutionTimeLbl}</p>
-                <p className={`text-[10px] ${textFaint} truncate`}>{t.resolutionTimeDesc}</p>
-              </div>
+              <p className={`text-sm font-semibold ${text} truncate`}>{t.slaResponseTitle}</p>
             </div>
             <button
               onClick={() => setHideSla(v => !v)}
@@ -205,10 +204,50 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
                   <XAxis dataKey="date" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
                   <YAxis domain={[0, 100]} unit="%" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
                   <Tooltip contentStyle={tooltipStyle} formatter={(v) => typeof v === 'number' ? `${v.toFixed(1)}%` : v} />
-                  <ReferenceLine y={90} stroke="#f59e0b" strokeDasharray="5 3" label={{ value: t.slaTargetLbl, fill: '#f59e0b', fontSize: 10 }} />
-                  <Line type="monotone" dataKey="slaPercentage" stroke="#7c3aed" strokeWidth={2} dot={{ fill: '#7c3aed', r: 3 }} name={t.resolutionTimeLbl} />
+                  <ReferenceLine y={90} stroke="#f59e0b" strokeDasharray="5 3" label={{ value: t.slaResponseTarget, fill: '#f59e0b', fontSize: 10, position: 'insideTopRight' }} />
+                  <Line type="monotone" dataKey="slaPercentage" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', r: 3 }} name={t.slaResponseLineName} />
                 </LineChart>
               </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── SLA Tarefas Concluídas no Prazo (resolution-time) ── */}
+      {hasResolutionTime && analytics?.resolutionTime && (
+        <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
+          <div className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-base leading-none">📋</span>
+              <p className={`text-sm font-semibold ${text} truncate`}>{t.slaResolutionTitle}</p>
+            </div>
+            <button
+              onClick={() => setHideResolution(v => !v)}
+              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition flex-shrink-0 ml-2 ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
+            >
+              <span className={`w-2 h-2 rounded-full ${hideResolution ? 'bg-slate-400' : 'bg-emerald-400'}`} />
+              {hideResolution ? t.showLabel : t.hideLabel}
+            </button>
+          </div>
+
+          {!hideResolution && analytics?.resolutionTime && (
+            <div className="px-4 sm:px-5 py-4">
+              {analytics.resolutionTime.data.length === 0 ? (
+                <p className={`text-xs ${textFaint} text-center py-6`}>
+                  {locale === 'pt' ? 'Nenhuma tarefa concluída no prazo registrada ainda.' : 'No tasks completed on time recorded yet.'}
+                </p>
+              ) : (
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={analytics.resolutionTime.data}>
+                  <CartesianGrid stroke={dark ? 'rgba(255,255,255,.06)' : '#e2e8f0'} />
+                  <XAxis dataKey="date" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis domain={[0, 100]} unit="%" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => typeof v === 'number' ? `${v.toFixed(1)}%` : v} />
+                  <ReferenceLine y={90} stroke="#ef4444" strokeDasharray="5 3" label={{ value: t.slaResolutionTarget, fill: '#ef4444', fontSize: 10, position: 'insideTopRight' }} />
+                  <Line type="monotone" dataKey="slaPercentage" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', r: 3 }} name={t.slaResolutionLineName} />
+                </LineChart>
+              </ResponsiveContainer>
+              )}
             </div>
           )}
         </div>

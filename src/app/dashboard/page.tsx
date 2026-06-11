@@ -16,6 +16,7 @@ import { NewTaskModal } from '@/components/dashboard/NewTaskModal'
 import { DeadlineModal } from '@/components/dashboard/DeadlineModal'
 import { ConfirmStartModal } from '@/components/dashboard/ConfirmStartModal'
 import { PersonalizeModal } from '@/components/dashboard/PersonalizeModal'
+import { CancelTaskModal } from '@/components/dashboard/CancelTaskModal'
 import { TaskItem } from '@/components/dashboard/TaskItem'
 import { Analytics } from '@/components/dashboard/Analytics'
 
@@ -23,7 +24,10 @@ function DashboardPage() {
   const router       = useRouter()
   const searchParams = useSearchParams()
   const isNew        = searchParams.get('new') === 'true'
-  const [locale, setLocale] = useState<Locale>('pt')
+  const [locale, setLocale] = useState<Locale>(() =>
+    typeof window !== 'undefined' ? (localStorage.getItem('locale') as Locale | null ?? 'pt') : 'pt'
+  )
+  useEffect(() => { localStorage.setItem('locale', locale) }, [locale])
   const t = translations[locale]
   const { prefs, set: setPrefs }      = useA11yPrefs()
   const dark                          = prefs.darkMode
@@ -75,7 +79,14 @@ function DashboardPage() {
     if (!token) return
     try {
       const data = await taskService.getAll(token)
-      setApiTasks(Array.isArray(data) ? data : [])
+      const sorted = Array.isArray(data)
+        ? [...data].sort((a, b) => {
+            const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+            const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+            return tB - tA
+          })
+        : []
+      setApiTasks(sorted)
     } catch {
       setApiTasks([])
     } finally {
@@ -97,13 +108,44 @@ function DashboardPage() {
       if (status.data.DONE.count > 0) {
         backlog = await analyticsApi.getBacklog(tok).catch(() => null)
       }
-      const [priority, averageTime, throughput, responseTime] = await Promise.all([
+      const [priority, averageTime, throughput, responseTime, resolutionTime] = await Promise.all([
         analyticsApi.getByPriority(tok),
         analyticsApi.getAverageTime(tok),
         analyticsApi.getThroughput(tok),
         analyticsApi.getResponseTime(tok),
+        analyticsApi.getResolutionTime(tok).catch(() => null),
       ])
-      setAnalytics({ status, priority, averageTime, throughput, backlog, responseTime })
+      // normalise resolution-time: detecta o campo percentual independente do nome retornado pela FastAPI
+      const normalizedResolution = resolutionTime ? {
+        ...resolutionTime,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        data: resolutionTime.data.map((item: any) => {
+          const CANDIDATE_FIELDS = [
+            'slaPercentage', 'resolutionPercentage', 'resolution_percentage',
+            'completion_rate', 'completionRate', 'completionPercentage', 'completion_percentage',
+            'percentage', 'sla_percentage', 'slaResolutionPercentage', 'sla_resolution_percentage',
+            'onTimePercentage', 'on_time_percentage', 'on_time_rate', 'onTimeRate',
+            'withinDeadlinePercentage', 'within_deadline_percentage',
+            'completedOnTimePercentage', 'completed_on_time_percentage',
+            'taskCompletionRate', 'task_completion_rate',
+            'slaCompliance', 'sla_compliance', 'resolutionRate', 'resolution_rate',
+          ]
+          let slaPercentage: number | undefined
+          for (const f of CANDIDATE_FIELDS) {
+            if (typeof item[f] === 'number') { slaPercentage = item[f]; break }
+          }
+          // fallback final: qualquer campo numérico > 0 e ≤ 100 exceto target/date
+          if (slaPercentage === undefined) {
+            for (const [k, v] of Object.entries(item)) {
+              if (typeof v === 'number' && v > 0 && v <= 100 && k !== 'target' && !k.toLowerCase().includes('date')) {
+                slaPercentage = v; break
+              }
+            }
+          }
+          return { date: item.date ?? '', slaPercentage: slaPercentage ?? 0, target: item.target ?? 90 }
+        }),
+      } : null
+      setAnalytics({ status, priority, averageTime, throughput, backlog, responseTime, resolutionTime: normalizedResolution })
     } catch {
       setAnalytics(null)
     }
@@ -163,17 +205,19 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
 
   async function confirmStart(id: string) {
     setConfirmStartId(null)
-    await taskService.update(id, { status: 'IN_PROGRESS' }, token).catch(() => {})
+    const now = new Date().toISOString()
+    setTaskDates(prev => ({ ...prev, [id]: { ...prev[id], started: now.slice(0, 10) } }))
+    await taskService.update(id, { status: 'IN_PROGRESS', startedAt: now }, token).catch(() => {})
     await fetchTasks()
     if (prefs.speechMode) speak('Tarefa iniciada')
   }
   async function finishTask(id: string) {
     const dates = taskDates[id]
     if (!dates?.deadline) { showToast('⚠ Defina um prazo antes de concluir a tarefa.'); return }
-    if (!dates?.started) { showToast('⚠ Inicie a tarefa antes de concluí-la.'); return }
+    const now = new Date().toISOString()
     setTaskStatuses(prev => ({ ...prev, [id]: 'Done' }))
     setTaskDates(prev => ({ ...prev, [id]: { ...prev[id], finished: today() } }))
-    await taskService.update(id, { status: 'DONE' }, token).catch(() => {})
+    await taskService.update(id, { status: 'DONE', completedAt: now }, token).catch(() => {})
     await fetchTasks()
     if (prefs.speechMode) speak('Tarefa concluída')
   }
@@ -235,6 +279,25 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
     await taskService.update(id, { title: val }, token).catch(() => {})
   }
   function cancelEditTitle(id: string) { setEditingTitle(prev => ({ ...prev, [id]: false })) }
+
+  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
+  async function confirmCancel() {
+    if (!confirmCancelId || !cancelReason.trim()) return
+    const id = confirmCancelId
+    setConfirmCancelId(null)
+    setCancelReason('')
+    setTaskStatuses(prev => ({ ...prev, [id]: 'Cancelled' }))
+    await taskService.update(id, { status: 'CANCELLED' }, token).catch(() => {})
+    await fetchTasks()
+    showToast('✓ Tarefa cancelada.')
+  }
+  async function deleteTask(id: string) {
+    if (!window.confirm('Excluir esta tarefa permanentemente? Esta ação não pode ser desfeita.')) return
+    await taskService.remove(id, token).catch(() => {})
+    await fetchTasks()
+    showToast('✓ Tarefa excluída.')
+  }
 
   async function saveDescToBank(id: string) {
     const val = draftDesc[id] ?? ''
@@ -312,15 +375,17 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
   const nDone      = tasks.filter(t => t.status === 'Done').length
   const completion = total > 0 ? Math.round((nDone / total) * 100) : 0
 
-  const nOverdue = useMemo(() => tasks.filter(t =>
+  const nOverdue    = useMemo(() => tasks.filter(t =>
     (t.status === 'Pending' || t.status === 'InProgress') &&
     taskDates[t.id]?.deadline && taskDates[t.id].deadline! < today()
   ).length, [tasks, taskDates])
+  const nCancelled  = tasks.filter(t => t.status === 'Cancelled').length
 
   const filtered = useMemo(() => {
     let list = filter === 'Overdue'
       ? tasks.filter(t => (t.status === 'Pending' || t.status === 'InProgress') && taskDates[t.id]?.deadline && taskDates[t.id].deadline! < today())
-      : filter === 'All' ? tasks : tasks.filter(t => t.status === filter)
+      : filter === 'All' ? tasks.filter(t => t.status !== 'Cancelled')
+      : tasks.filter(t => t.status === filter)
     if (priorityFilter !== 'All') list = list.filter(t => t.priority === priorityFilter)
     return list
   }, [filter, tasks, taskDates, priorityFilter])
@@ -347,6 +412,7 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
     { key: 'InProgress', label: t.sInProgress },
     { key: 'Done',       label: t.statusDone },
     { key: 'Overdue',    label: t.sOverdue, badge: nOverdue },
+    { key: 'Cancelled',  label: t.cancelledFilter, badge: nCancelled > 0 ? nCancelled : undefined },
   ]
 
   if (!isAuthChecked) return null
@@ -356,7 +422,7 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
 
       {/* modal personalizar experiência */}
       {showPersonalizeModal && (
-        <PersonalizeModal onClose={() => setShowPersonalizeModal(false)} locale={locale} />
+        <PersonalizeModal onClose={() => setShowPersonalizeModal(false)} locale={locale} dark={dark} />
       )}
 
       {/* modal nova tarefa */}
@@ -388,6 +454,19 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
           setStep={setDeadlineChangeStep}
           onConfirm={() => confirmDeadlineChange(confirmDeadlineId)}
           onClose={() => { setConfirmDeadlineId(null); setDeadlineChangeStep(null); setDeadlineChangeReason(''); setDeadlineDraft(prev => ({ ...prev, [confirmDeadlineId]: '' })) }}
+        />
+      )}
+
+      {/* modal cancelar tarefa */}
+      {confirmCancelId && (
+        <CancelTaskModal
+          dark={dark}
+          locale={locale}
+          taskTitle={tasks.find(t => t.id === confirmCancelId)?.title ?? ''}
+          reason={cancelReason}
+          setReason={setCancelReason}
+          onConfirm={confirmCancel}
+          onClose={() => { setConfirmCancelId(null); setCancelReason('') }}
         />
       )}
 
@@ -670,13 +749,14 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
                   onSetDraftTitle={(val) => setDraftTitle(prev => ({ ...prev, [task.id]: val }))}
                   onSetConfirmStart={() => setConfirmStartId(task.id)}
                   onFinishTask={() => finishTask(task.id)}
-                  onReopenTask={() => reopenTask(task.id)}
                   onSaveDeadline={() => saveDeadline(task.id)}
                   onSetConfirmDeadline={() => { setConfirmDeadlineId(task.id); setDeadlineChangeStep('ask') }}
                   onSetDeadlineStep={(s) => setDeadlineChangeStep(s)}
                   onSetEditingDeadline={() => { setEditingDeadlineId(task.id); setDeadlineDraft(prev => ({ ...prev, [task.id]: '' })) }}
                   onSetDeadlineDraft={(val) => setDeadlineDraft(prev => ({ ...prev, [task.id]: val }))}
                   onCancelDeadlineEdit={() => setEditingDeadlineId(null)}
+                  onCancelTask={() => setConfirmCancelId(task.id)}
+                  onDeleteTask={() => deleteTask(task.id)}
                 />
               ))}
             </ul>

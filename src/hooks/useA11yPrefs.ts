@@ -39,11 +39,10 @@ function load(): A11yPrefs {
 }
 
 export function useA11yPrefs() {
-  const [prefs, setPrefs] = useState<A11yPrefs>(DEFAULTS)
-
-  useEffect(() => {
-    setPrefs(load())
-  }, [])
+  const [prefs, setPrefs] = useState<A11yPrefs>(() => {
+    if (typeof window === 'undefined') return DEFAULTS
+    return load()
+  })
 
   useEffect(() => {
     const root = document.documentElement

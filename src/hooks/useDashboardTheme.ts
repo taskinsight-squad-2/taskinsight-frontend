@@ -60,10 +60,12 @@ export function useDashboardTheme(dark: boolean) {
     Pending:    { color: 'bg-slate-500/10 text-slate-400 border border-slate-500/20',   label: 'Pendente'    },
     InProgress: { color: 'bg-blue-500/10 text-blue-400 border border-blue-500/20',      label: 'Em andamento' },
     Done:       { color: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20', label: 'Concluída' },
+    Cancelled:  { color: 'bg-rose-500/10 text-rose-400 border border-rose-500/20',      label: 'Cancelada'   },
   } : {
     Pending:    { color: 'bg-slate-100 text-slate-500 border border-slate-200',   label: 'Pendente'    },
     InProgress: { color: 'bg-blue-50 text-blue-600 border border-blue-200',       label: 'Em andamento' },
     Done:       { color: 'bg-emerald-50 text-emerald-600 border border-emerald-200', label: 'Concluída' },
+    Cancelled:  { color: 'bg-rose-50 text-rose-600 border border-rose-200',       label: 'Cancelada'   },
   }
 
   return {
