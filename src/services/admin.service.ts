@@ -41,4 +41,13 @@ export const adminService = {
     });
     return handleResponse<User[]>(res);
   },
+
+  getDeletedCount: async (token?: string): Promise<number> => {
+    if (!BASE_URL) throw new Error("NEXT_PUBLIC_NODE_API_URL não está definida");
+    const res = await fetch(`${BASE_URL}/api/tasks/deleted-count`, {
+      headers: createHeaders(token),
+    });
+    const data = await handleResponse<{ count: number }>(res);
+    return data.count;
+  },
 };

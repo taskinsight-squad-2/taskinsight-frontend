@@ -39,5 +39,7 @@ export interface UpdateTask {
   status?: TaskStatus;
   priority?: TaskPriority;
   dueDate?: string;
+  startedAt?: string;
+  completedAt?: string;
   deadlineChangeReason?: string;
 }

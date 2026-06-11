@@ -65,3 +65,14 @@ export interface ResponseTimeResponse {
   success: boolean;
   data: ResponseTimeItem[];
 }
+
+export interface ResolutionTimeItem {
+  date: string;
+  slaPercentage: number;
+  target: number;
+}
+
+export interface ResolutionTimeResponse {
+  success: boolean;
+  data: ResolutionTimeItem[];
+}

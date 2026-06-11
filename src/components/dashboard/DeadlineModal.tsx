@@ -93,7 +93,7 @@ export function DeadlineModal({
               </button>
               <button onClick={onConfirm}
                 disabled={!deadlineChangeReason.trim() || !deadlineDraft}
-                className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 transition disabled:opacity-40 disabled:cursor-not-allowed">
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 transition disabled:bg-none disabled:from-slate-300 disabled:to-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed">
                 Confirmar
               </button>
             </div>

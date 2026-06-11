@@ -16,15 +16,18 @@ import { NewTaskModal } from '@/components/dashboard/NewTaskModal'
 import { DeadlineModal } from '@/components/dashboard/DeadlineModal'
 import { ConfirmStartModal } from '@/components/dashboard/ConfirmStartModal'
 import { PersonalizeModal } from '@/components/dashboard/PersonalizeModal'
+import { CancelTaskModal } from '@/components/dashboard/CancelTaskModal'
 import { TaskItem } from '@/components/dashboard/TaskItem'
-import { ProgressChart } from '@/components/dashboard/ProgressChart'
 import { Analytics } from '@/components/dashboard/Analytics'
 
 function DashboardPage() {
   const router       = useRouter()
   const searchParams = useSearchParams()
   const isNew        = searchParams.get('new') === 'true'
-  const [locale, setLocale] = useState<Locale>('pt')
+  const [locale, setLocale] = useState<Locale>(() =>
+    typeof window !== 'undefined' ? (localStorage.getItem('locale') as Locale | null ?? 'pt') : 'pt'
+  )
+  useEffect(() => { localStorage.setItem('locale', locale) }, [locale])
   const t = translations[locale]
   const { prefs, set: setPrefs }      = useA11yPrefs()
   const dark                          = prefs.darkMode
@@ -76,7 +79,14 @@ function DashboardPage() {
     if (!token) return
     try {
       const data = await taskService.getAll(token)
-      setApiTasks(Array.isArray(data) ? data : [])
+      const sorted = Array.isArray(data)
+        ? [...data].sort((a, b) => {
+            const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+            const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+            return tB - tA
+          })
+        : []
+      setApiTasks(sorted)
     } catch {
       setApiTasks([])
     } finally {
@@ -98,13 +108,44 @@ function DashboardPage() {
       if (status.data.DONE.count > 0) {
         backlog = await analyticsApi.getBacklog(tok).catch(() => null)
       }
-      const [priority, averageTime, throughput, responseTime] = await Promise.all([
+      const [priority, averageTime, throughput, responseTime, resolutionTime] = await Promise.all([
         analyticsApi.getByPriority(tok),
         analyticsApi.getAverageTime(tok),
         analyticsApi.getThroughput(tok),
         analyticsApi.getResponseTime(tok),
+        analyticsApi.getResolutionTime(tok).catch(() => null),
       ])
-      setAnalytics({ status, priority, averageTime, throughput, backlog, responseTime })
+      // normalise resolution-time: detecta o campo percentual independente do nome retornado pela FastAPI
+      const normalizedResolution = resolutionTime ? {
+        ...resolutionTime,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        data: resolutionTime.data.map((item: any) => {
+          const CANDIDATE_FIELDS = [
+            'slaPercentage', 'resolutionPercentage', 'resolution_percentage',
+            'completion_rate', 'completionRate', 'completionPercentage', 'completion_percentage',
+            'percentage', 'sla_percentage', 'slaResolutionPercentage', 'sla_resolution_percentage',
+            'onTimePercentage', 'on_time_percentage', 'on_time_rate', 'onTimeRate',
+            'withinDeadlinePercentage', 'within_deadline_percentage',
+            'completedOnTimePercentage', 'completed_on_time_percentage',
+            'taskCompletionRate', 'task_completion_rate',
+            'slaCompliance', 'sla_compliance', 'resolutionRate', 'resolution_rate',
+          ]
+          let slaPercentage: number | undefined
+          for (const f of CANDIDATE_FIELDS) {
+            if (typeof item[f] === 'number') { slaPercentage = item[f]; break }
+          }
+          // fallback final: qualquer campo numérico > 0 e ≤ 100 exceto target/date
+          if (slaPercentage === undefined) {
+            for (const [k, v] of Object.entries(item)) {
+              if (typeof v === 'number' && v > 0 && v <= 100 && k !== 'target' && !k.toLowerCase().includes('date')) {
+                slaPercentage = v; break
+              }
+            }
+          }
+          return { date: item.date ?? '', slaPercentage: slaPercentage ?? 0, target: item.target ?? 90 }
+        }),
+      } : null
+      setAnalytics({ status, priority, averageTime, throughput, backlog, responseTime, resolutionTime: normalizedResolution })
     } catch {
       setAnalytics(null)
     }
@@ -164,17 +205,19 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
 
   async function confirmStart(id: string) {
     setConfirmStartId(null)
-    await taskService.update(id, { status: 'IN_PROGRESS' }, token).catch(() => {})
+    const now = new Date().toISOString()
+    setTaskDates(prev => ({ ...prev, [id]: { ...prev[id], started: now.slice(0, 10) } }))
+    await taskService.update(id, { status: 'IN_PROGRESS', startedAt: now }, token).catch(() => {})
     await fetchTasks()
     if (prefs.speechMode) speak('Tarefa iniciada')
   }
   async function finishTask(id: string) {
     const dates = taskDates[id]
     if (!dates?.deadline) { showToast('⚠ Defina um prazo antes de concluir a tarefa.'); return }
-    if (!dates?.started) { showToast('⚠ Inicie a tarefa antes de concluí-la.'); return }
+    const now = new Date().toISOString()
     setTaskStatuses(prev => ({ ...prev, [id]: 'Done' }))
     setTaskDates(prev => ({ ...prev, [id]: { ...prev[id], finished: today() } }))
-    await taskService.update(id, { status: 'DONE' }, token).catch(() => {})
+    await taskService.update(id, { status: 'DONE', completedAt: now }, token).catch(() => {})
     await fetchTasks()
     if (prefs.speechMode) speak('Tarefa concluída')
   }
@@ -237,6 +280,25 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
   }
   function cancelEditTitle(id: string) { setEditingTitle(prev => ({ ...prev, [id]: false })) }
 
+  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
+  async function confirmCancel() {
+    if (!confirmCancelId || !cancelReason.trim()) return
+    const id = confirmCancelId
+    setConfirmCancelId(null)
+    setCancelReason('')
+    setTaskStatuses(prev => ({ ...prev, [id]: 'Cancelled' }))
+    await taskService.update(id, { status: 'CANCELLED' }, token).catch(() => {})
+    await fetchTasks()
+    showToast('✓ Tarefa cancelada.')
+  }
+  async function deleteTask(id: string) {
+    if (!window.confirm('Excluir esta tarefa permanentemente? Esta ação não pode ser desfeita.')) return
+    await taskService.remove(id, token).catch(() => {})
+    await fetchTasks()
+    showToast('✓ Tarefa excluída.')
+  }
+
   async function saveDescToBank(id: string) {
     const val = draftDesc[id] ?? ''
     setDescriptions(prev => ({ ...prev, [id]: val }))
@@ -247,7 +309,7 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
   // ── criar tarefa ─────────────────────────────────────────────────
   const [showPersonalizeModal, setShowPersonalizeModal] = useState(false)
   const [showNewTask, setShowNewTask] = useState(false)
-  const [newTaskForm, setNewTaskForm] = useState({ title: '', description: '', priority: 'MEDIUM' as ApiTask['priority'] })
+  const [newTaskForm, setNewTaskForm] = useState({ title: '', description: '', priority: 'MEDIUM' as ApiTask['priority'], deadline: '' })
   const [savingTask, setSavingTask]   = useState(false)
 
   const trapNewTask  = useFocusTrap(showNewTask)
@@ -256,13 +318,14 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
 
   async function handleCreateTask(e: React.FormEvent) {
     e.preventDefault()
-    if (!newTaskForm.title.trim()) return
+    if (!newTaskForm.title.trim() || !newTaskForm.deadline) return
     setSavingTask(true)
     try {
-      await taskService.create({ title: newTaskForm.title, description: newTaskForm.description, priority: newTaskForm.priority }, token)
-      setNewTaskForm({ title: '', description: '', priority: 'MEDIUM' })
+      await taskService.create({ title: newTaskForm.title, description: newTaskForm.description, priority: newTaskForm.priority, dueDate: newTaskForm.deadline }, token)
+      setNewTaskForm({ title: '', description: '', priority: 'MEDIUM', deadline: '' })
       setShowNewTask(false)
       await fetchTasks()
+      loadAnalytics()
       showToast('✓ Tarefa criada com sucesso!')
     } catch { showToast('Erro ao criar tarefa.') }
     finally { setSavingTask(false) }
@@ -312,15 +375,17 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
   const nDone      = tasks.filter(t => t.status === 'Done').length
   const completion = total > 0 ? Math.round((nDone / total) * 100) : 0
 
-  const nOverdue = useMemo(() => tasks.filter(t =>
+  const nOverdue    = useMemo(() => tasks.filter(t =>
     (t.status === 'Pending' || t.status === 'InProgress') &&
     taskDates[t.id]?.deadline && taskDates[t.id].deadline! < today()
   ).length, [tasks, taskDates])
+  const nCancelled  = tasks.filter(t => t.status === 'Cancelled').length
 
   const filtered = useMemo(() => {
     let list = filter === 'Overdue'
       ? tasks.filter(t => (t.status === 'Pending' || t.status === 'InProgress') && taskDates[t.id]?.deadline && taskDates[t.id].deadline! < today())
-      : filter === 'All' ? tasks : tasks.filter(t => t.status === filter)
+      : filter === 'All' ? tasks.filter(t => t.status !== 'Cancelled')
+      : tasks.filter(t => t.status === filter)
     if (priorityFilter !== 'All') list = list.filter(t => t.priority === priorityFilter)
     return list
   }, [filter, tasks, taskDates, priorityFilter])
@@ -347,6 +412,7 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
     { key: 'InProgress', label: t.sInProgress },
     { key: 'Done',       label: t.statusDone },
     { key: 'Overdue',    label: t.sOverdue, badge: nOverdue },
+    { key: 'Cancelled',  label: t.cancelledFilter, badge: nCancelled > 0 ? nCancelled : undefined },
   ]
 
   if (!isAuthChecked) return null
@@ -356,7 +422,7 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
 
       {/* modal personalizar experiência */}
       {showPersonalizeModal && (
-        <PersonalizeModal onClose={() => setShowPersonalizeModal(false)} />
+        <PersonalizeModal onClose={() => setShowPersonalizeModal(false)} locale={locale} dark={dark} />
       )}
 
       {/* modal nova tarefa */}
@@ -388,6 +454,19 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
           setStep={setDeadlineChangeStep}
           onConfirm={() => confirmDeadlineChange(confirmDeadlineId)}
           onClose={() => { setConfirmDeadlineId(null); setDeadlineChangeStep(null); setDeadlineChangeReason(''); setDeadlineDraft(prev => ({ ...prev, [confirmDeadlineId]: '' })) }}
+        />
+      )}
+
+      {/* modal cancelar tarefa */}
+      {confirmCancelId && (
+        <CancelTaskModal
+          dark={dark}
+          locale={locale}
+          taskTitle={tasks.find(t => t.id === confirmCancelId)?.title ?? ''}
+          reason={cancelReason}
+          setReason={setCancelReason}
+          onConfirm={confirmCancel}
+          onClose={() => { setConfirmCancelId(null); setCancelReason('') }}
         />
       )}
 
@@ -437,7 +516,7 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
               {/* desktop: Personalizar */}
               <button
                 onClick={() => setShowPersonalizeModal(true)}
-                aria-label="Personalizar experiência de acessibilidade"
+                aria-label={t.personalizeBtn}
                 className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border ${ctrlBg} hover:opacity-80 transition text-xs font-semibold`}>
                 <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
@@ -472,12 +551,12 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
                   Admin
                 </button>
               )}
-              {/* sempre: Sair */}
+              {/* desktop: Sair */}
               <button onClick={handleLogout}
                 aria-label="Sair da conta"
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 transition">
+                className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 transition">
                 <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                <span className="hidden sm:inline">{t.signOut}</span>
+                {t.signOut}
               </button>
               {/* sempre: Nova Tarefa */}
               <button onClick={() => setShowNewTask(true)} aria-label="Criar nova tarefa" className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-xs font-semibold hover:from-violet-500 hover:to-indigo-500 transition shadow-lg shadow-violet-500/25">
@@ -492,7 +571,7 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
             {/* Personalizar */}
             <button
               onClick={() => setShowPersonalizeModal(true)}
-              aria-label="Personalizar experiência"
+              aria-label={t.personalizeBtn}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border ${ctrlBg} hover:opacity-80 transition text-xs font-semibold whitespace-nowrap flex-shrink-0`}>
               <svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
@@ -500,7 +579,7 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
                 <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
                 <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>
               </svg>
-              Personalizar
+              {t.personalizeBtn}
             </button>
             {/* PT/EN toggle */}
             <div className={`flex items-center h-[30px] rounded-lg border ${ctrlBg} overflow-hidden text-xs font-bold flex-shrink-0`}>
@@ -528,6 +607,13 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
                 Admin
               </button>
             )}
+            {/* mobile: Sair */}
+            <button onClick={handleLogout}
+              aria-label="Sair da conta"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-red-500/20 bg-red-500/10 text-red-500 text-xs font-semibold whitespace-nowrap flex-shrink-0 hover:bg-red-500/20 transition">
+              <svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              {t.signOut}
+            </button>
           </div>
         </div>
 
@@ -663,13 +749,14 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
                   onSetDraftTitle={(val) => setDraftTitle(prev => ({ ...prev, [task.id]: val }))}
                   onSetConfirmStart={() => setConfirmStartId(task.id)}
                   onFinishTask={() => finishTask(task.id)}
-                  onReopenTask={() => reopenTask(task.id)}
                   onSaveDeadline={() => saveDeadline(task.id)}
                   onSetConfirmDeadline={() => { setConfirmDeadlineId(task.id); setDeadlineChangeStep('ask') }}
                   onSetDeadlineStep={(s) => setDeadlineChangeStep(s)}
                   onSetEditingDeadline={() => { setEditingDeadlineId(task.id); setDeadlineDraft(prev => ({ ...prev, [task.id]: '' })) }}
                   onSetDeadlineDraft={(val) => setDeadlineDraft(prev => ({ ...prev, [task.id]: val }))}
                   onCancelDeadlineEdit={() => setEditingDeadlineId(null)}
+                  onCancelTask={() => setConfirmCancelId(task.id)}
+                  onDeleteTask={() => deleteTask(task.id)}
                 />
               ))}
             </ul>
@@ -699,18 +786,6 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
               </div>
             )}
           </div>
-
-          {/* ── Gráfico de acompanhamento ── */}
-          <ProgressChart
-            dark={dark}
-            isClient={isClient}
-            locale={locale}
-            apiTasks={apiTasks}
-            taskDates={taskDates}
-            taskStatuses={taskStatuses}
-            total={total}
-            theme={theme}
-          />
 
           {/* ── Analytics FastAPI ── */}
           {analytics?.status && (
