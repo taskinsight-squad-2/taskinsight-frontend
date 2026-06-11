@@ -1,7 +1,10 @@
 'use client'
 
-import React from 'react'
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import React, { useState } from 'react'
+import {
+  LineChart, Line,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
+} from 'recharts'
 import type { AnalyticsResult } from '@/types/dashboard'
 import type { DashboardTheme } from '@/hooks/useDashboardTheme'
 import { translations, type Locale } from '@/lib/i18n'
@@ -9,144 +12,247 @@ import { translations, type Locale } from '@/lib/i18n'
 interface AnalyticsProps {
   dark: boolean
   locale: Locale
-  analytics: AnalyticsResult
+  analytics: AnalyticsResult | null
   theme: DashboardTheme
+}
+
+function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
+  const pct = max > 0 ? Math.round((value / max) * 100) : 0
+  return (
+    <div className="flex items-center gap-2 min-w-0">
+      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: color + '22' }}>
+        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: color }} />
+      </div>
+      <span className="text-[11px] font-bold tabular-nums w-5 text-right" style={{ color }}>{value}</span>
+    </div>
+  )
 }
 
 export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
   const { text, textFaint, cardBg } = theme
   const t = translations[locale]
+  const [hideOverview, setHideOverview] = useState(false)
+  const [hideChart, setHideChart] = useState(false)
+  const [hideSla, setHideSla] = useState(false)
+  const [hideResolution, setHideResolution] = useState(false)
+
+  const st  = analytics?.status?.data
+  const pr  = analytics?.priority?.data
+  const atd = analytics?.averageTime?.data
+  const hasThroughput     = (analytics?.throughput?.data.length     ?? 0) > 0
+  const hasResponseTime   = (analytics?.responseTime?.data.length   ?? 0) > 0
+  const hasResolutionTime = (analytics?.resolutionTime?.data.length ?? 0) > 0
+
+  const stMax = st ? Math.max(st.PENDING.count, st.IN_PROGRESS.count, st.DONE.count, st.CANCELLED?.count ?? 0, 1) : 1
+  const prMax = pr ? Math.max(pr.HIGH.count, pr.MEDIUM.count, pr.LOW.count, 1) : 1
+
+  const border = dark ? 'border-white/8' : 'border-slate-100'
+
+  const tooltipStyle = {
+    backgroundColor: dark ? '#111827' : '#fff',
+    border: `1px solid ${dark ? 'rgba(255,255,255,0.1)' : '#e2e8f0'}`,
+    borderRadius: 8, fontSize: 11,
+    color: dark ? '#fff' : '#1e293b',
+  }
 
   return (
-    <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
-      <div className={`px-5 pt-4 pb-3 border-b ${dark ? 'border-white/5' : 'border-slate-100'}`}>
-        <p className={`text-sm font-semibold ${text}`}>Analytics</p>
-        <p className={`text-xs ${textFaint} mt-0.5`}>{t.analyticsSubtitle}</p>
-      </div>
+    <div className="flex flex-col gap-3">
 
-      <div className="px-3 sm:px-5 py-4 sm:py-5 space-y-6">
-
-        {/* Status */}
-        <div>
-          <p className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`}>{t.byStatus}</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              { label: t.totalTasks,    value: analytics.status!.data.total_tasks,      accent: 'text-violet-500' },
-              { label: t.statusPending, value: analytics.status!.data.PENDING.count,    accent: dark ? 'text-white/55' : 'text-slate-500', sub: `${analytics.status!.data.PENDING.percent}%` },
-              { label: t.statProgress,  value: analytics.status!.data.IN_PROGRESS.count, accent: 'text-blue-400', sub: `${analytics.status!.data.IN_PROGRESS.percent}%` },
-              { label: t.statusDone,    value: analytics.status!.data.DONE.count,       accent: 'text-emerald-400', sub: `${analytics.status!.data.DONE.percent}%` },
-            ].map(s => (
-              <div key={s.label} className={`${dark ? 'bg-white/[0.03] border-white/8' : 'bg-slate-50 border-slate-200'} border rounded-xl px-4 py-3`}>
-                <p className={`text-[10px] font-semibold ${textFaint} uppercase tracking-widest`}>{s.label}</p>
-                <p className={`text-xl font-black ${s.accent} leading-tight mt-1`}>{s.value}</p>
-                {s.sub && <p className={`text-[10px] ${textFaint} mt-0.5`}>{s.sub}</p>}
-              </div>
-            ))}
+      {/* ── Overview: status + priority + avg time ── */}
+      <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
+        <div className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}>
+          <div className="flex items-center gap-2">
+            <span className="text-base leading-none">📊</span>
+            <p className={`text-sm font-semibold ${text}`}>{t.metricsTitle}</p>
           </div>
+          <button
+            onClick={() => setHideOverview(v => !v)}
+            className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
+          >
+            <span className={`w-2 h-2 rounded-full ${hideOverview ? 'bg-slate-400' : 'bg-emerald-400'}`} />
+            {hideOverview ? t.showDataBtn : t.hideDataBtn}
+          </button>
         </div>
 
-        {/* Prioridade */}
-        {analytics.priority && (
-          <div>
-            <p className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`}>{t.byPriority}</p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {[
-                { label: t.priorityHigh,   value: analytics.priority.data.HIGH.count,   sub: `${analytics.priority.data.HIGH.percent}%`,   accent: 'text-red-400'     },
-                { label: t.priorityMedium, value: analytics.priority.data.MEDIUM.count, sub: `${analytics.priority.data.MEDIUM.percent}%`, accent: 'text-amber-400'   },
-                { label: t.priorityLow,    value: analytics.priority.data.LOW.count,    sub: `${analytics.priority.data.LOW.percent}%`,    accent: 'text-emerald-400' },
-              ].map(s => (
-                <div key={s.label} className={`${dark ? 'bg-white/[0.03] border-white/8' : 'bg-slate-50 border-slate-200'} border rounded-xl px-4 py-3`}>
-                  <p className={`text-[10px] font-semibold ${textFaint} uppercase tracking-widest`}>{s.label}</p>
-                  <p className={`text-xl font-black ${s.accent} leading-tight mt-1`}>{s.value}</p>
-                  <p className={`text-[10px] ${textFaint} mt-0.5`}>{s.sub}</p>
-                </div>
-              ))}
-            </div>
+        {!hideOverview && (
+          <div className="px-4 sm:px-5 py-4">
+            {(!st && !pr && !atd) ? (
+              <p className={`text-xs ${textFaint} text-center py-6`}>{t.insufficient}</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+
+                {/* Status */}
+                {st && (
+                  <div>
+                    <p className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`}>{t.byStatus}</p>
+                    <div className="flex flex-col gap-2.5">
+                      {[
+                        { label: t.statusPending, value: st.PENDING.count,     color: dark ? '#94a3b8' : '#64748b' },
+                        { label: t.sInProgress,   value: st.IN_PROGRESS.count, color: '#3b82f6' },
+                        { label: t.statusDone,    value: st.DONE.count,        color: '#10b981' },
+                        ...(st.CANCELLED ? [{ label: t.sCancelled, value: st.CANCELLED.count, color: '#f43f5e' }] : []),
+                      ].map(r => (
+                        <div key={r.label}>
+                          <span className={`text-[11px] ${textFaint} block mb-0.5`}>{r.label}</span>
+                          <MiniBar value={r.value} max={stMax} color={r.color} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Priority */}
+                {pr && (
+                  <div>
+                    <p className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`}>{t.byPriority}</p>
+                    <div className="flex flex-col gap-2.5">
+                      {[
+                        { label: t.priorityHigh,   value: pr.HIGH.count,   color: '#ef4444' },
+                        { label: t.priorityMedium, value: pr.MEDIUM.count, color: '#f59e0b' },
+                        { label: t.priorityLow,    value: pr.LOW.count,    color: '#10b981' },
+                      ].map(r => (
+                        <div key={r.label}>
+                          <span className={`text-[11px] ${textFaint} block mb-0.5`}>{r.label}</span>
+                          <MiniBar value={r.value} max={prMax} color={r.color} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Avg time */}
+                {atd && (
+                  <div>
+                    <p className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`}>{t.avgCompletionLbl}</p>
+                    <p className={`text-3xl font-black ${text} tabular-nums leading-none mb-3`}>
+                      {atd.average_time_hours.toFixed(1)}<span className={`text-lg font-semibold ${textFaint} ml-0.5`}>h</span>
+                    </p>
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-baseline gap-1.5">
+                        <span className={`text-base font-bold ${text} tabular-nums`}>{atd.average_time_days.toFixed(2)}</span>
+                        <span className={`text-[11px] ${textFaint}`}>{t.daysLabel.toLowerCase()}</span>
+                      </div>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className={`text-base font-bold ${text} tabular-nums`}>{Math.round(atd.average_time_hours * 60)}</span>
+                        <span className={`text-[11px] ${textFaint}`}>{locale === 'pt' ? 'minutos' : 'minutes'}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            )}
           </div>
         )}
+      </div>
 
-        {/* Tempo médio */}
-        {analytics.averageTime && (
-          <div>
-            <p className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`}>{t.avgCompletionLbl}</p>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: t.hoursLabel, value: analytics.averageTime.data.average_time_hours.toFixed(1) },
-                { label: t.daysLabel,  value: analytics.averageTime.data.average_time_days.toFixed(1)  },
-              ].map(s => (
-                <div key={s.label} className={`${dark ? 'bg-white/[0.03] border-white/8' : 'bg-slate-50 border-slate-200'} border rounded-xl px-4 py-3`}>
-                  <p className={`text-[10px] font-semibold ${textFaint} uppercase tracking-widest`}>{s.label}</p>
-                  <p className={`text-xl font-black ${text} leading-tight mt-1`}>{s.value}</p>
-                </div>
-              ))}
+      {/* ── Throughput / Produtividade Diária ── */}
+      {hasThroughput && (
+        <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
+          <div className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}>
+            <div className="flex items-center gap-2">
+              <span className="text-base leading-none">📈</span>
+              <p className={`text-sm font-semibold ${text}`}>{t.dailyProductivity}</p>
             </div>
+            <button
+              onClick={() => setHideChart(v => !v)}
+              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
+            >
+              <span className={`w-2 h-2 rounded-full ${hideChart ? 'bg-slate-400' : 'bg-emerald-400'}`} />
+              {hideChart ? t.showLabel : t.hideLabel}
+            </button>
           </div>
-        )}
 
-        {/* Throughput */}
-        <div>
-          <p className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`}>{t.throughputLbl}</p>
-          {analytics.throughput?.data.length ? (
-            <div className={`${dark ? 'bg-white/[0.03] border-white/8' : 'bg-slate-50 border-slate-200'} border rounded-xl p-4`}>
-              <ResponsiveContainer width="100%" height={200}>
+          {!hideChart && analytics?.throughput && (
+            <div className="px-4 sm:px-5 py-4">
+              <ResponsiveContainer width="100%" height={180}>
                 <LineChart data={analytics.throughput.data}>
                   <CartesianGrid stroke={dark ? 'rgba(255,255,255,.06)' : '#e2e8f0'} />
-                  <XAxis dataKey="day" stroke={dark ? 'rgba(255,255,255,.3)' : '#94a3b8'} tick={{ fontSize: 11, fill: dark ? 'rgba(255,255,255,.4)' : '#64748b' }} />
-                  <YAxis stroke={dark ? 'rgba(255,255,255,.3)' : '#94a3b8'} tick={{ fontSize: 11, fill: dark ? 'rgba(255,255,255,.4)' : '#64748b' }} />
-                  <Tooltip contentStyle={{ backgroundColor: dark ? '#1a2030' : '#fff', border: `1px solid ${dark ? 'rgba(255,255,255,.1)' : '#e2e8f0'}`, borderRadius: '8px', color: dark ? '#fff' : '#1e293b', fontSize: 12 }} />
+                  <XAxis dataKey="day" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={tooltipStyle} />
                   <Line type="monotone" dataKey="count" stroke="#7c3aed" strokeWidth={2} dot={{ fill: '#7c3aed', r: 3 }} name={t.sDonePlural} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
-          ) : (
-            <div className={`${dark ? 'border-white/8 text-white/25' : 'border-slate-200 text-slate-400'} border border-dashed rounded-xl px-4 py-3 text-xs`}>{t.insufficient}</div>
           )}
         </div>
+      )}
 
-        {/* Backlog */}
-        <div>
-          <p className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`}>{t.backlogEvol}</p>
-          {analytics.backlog?.data.length ? (
-            <div className={`${dark ? 'bg-white/[0.03] border-white/8' : 'bg-slate-50 border-slate-200'} border rounded-xl p-4`}>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={analytics.backlog.data}>
-                  <CartesianGrid stroke={dark ? 'rgba(255,255,255,.06)' : '#e2e8f0'} />
-                  <XAxis dataKey="date" stroke={dark ? 'rgba(255,255,255,.3)' : '#94a3b8'} tick={{ fontSize: 11, fill: dark ? 'rgba(255,255,255,.4)' : '#64748b' }} />
-                  <YAxis stroke={dark ? 'rgba(255,255,255,.3)' : '#94a3b8'} tick={{ fontSize: 11, fill: dark ? 'rgba(255,255,255,.4)' : '#64748b' }} />
-                  <Tooltip contentStyle={{ backgroundColor: dark ? '#1a2030' : '#fff', border: `1px solid ${dark ? 'rgba(255,255,255,.1)' : '#e2e8f0'}`, borderRadius: '8px', color: dark ? '#fff' : '#1e293b', fontSize: 12 }} />
-                  <Bar dataKey="criadas"    fill="#6366f1" name={t.createdBar}    radius={[3,3,0,0]} />
-                  <Bar dataKey="finalizadas" fill="#10b981" name={t.finalizedBar} radius={[3,3,0,0]} />
-                  <Bar dataKey="backlog"    fill="#ef4444" name="Backlog"          radius={[3,3,0,0]} />
-                </BarChart>
-              </ResponsiveContainer>
+      {/* ── SLA Atendimento Inicial (response-time) ── */}
+      {hasResponseTime && (
+        <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
+          <div className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-base leading-none">⏱</span>
+              <p className={`text-sm font-semibold ${text} truncate`}>{t.slaResponseTitle}</p>
             </div>
-          ) : (
-            <div className={`${dark ? 'border-white/8 text-white/25' : 'border-slate-200 text-slate-400'} border border-dashed rounded-xl px-4 py-3 text-xs`}>{t.insufficient}</div>
-          )}
-        </div>
+            <button
+              onClick={() => setHideSla(v => !v)}
+              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition flex-shrink-0 ml-2 ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
+            >
+              <span className={`w-2 h-2 rounded-full ${hideSla ? 'bg-slate-400' : 'bg-emerald-400'}`} />
+              {hideSla ? t.showLabel : t.hideLabel}
+            </button>
+          </div>
 
-        {/* Response Time */}
-        <div>
-          <p className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`}>{t.slaLbl}</p>
-          {analytics.responseTime?.data.length ? (
-            <div className={`${dark ? 'bg-white/[0.03] border-white/8' : 'bg-slate-50 border-slate-200'} border rounded-xl p-4`}>
+          {!hideSla && analytics?.responseTime && (
+            <div className="px-4 sm:px-5 py-4">
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={analytics.responseTime.data}>
                   <CartesianGrid stroke={dark ? 'rgba(255,255,255,.06)' : '#e2e8f0'} />
-                  <XAxis dataKey="date" stroke={dark ? 'rgba(255,255,255,.3)' : '#94a3b8'} tick={{ fontSize: 11, fill: dark ? 'rgba(255,255,255,.4)' : '#64748b' }} />
-                  <YAxis stroke={dark ? 'rgba(255,255,255,.3)' : '#94a3b8'} tick={{ fontSize: 11, fill: dark ? 'rgba(255,255,255,.4)' : '#64748b' }} unit="%" />
-                  <Tooltip contentStyle={{ backgroundColor: dark ? '#1a2030' : '#fff', border: `1px solid ${dark ? 'rgba(255,255,255,.1)' : '#e2e8f0'}`, borderRadius: '8px', color: dark ? '#fff' : '#1e293b', fontSize: 12 }} formatter={(v) => typeof v === 'number' ? `${v}%` : ''} />
-                  <Line type="monotone" dataKey="slaPercentage" stroke="#f59e0b" strokeWidth={2} dot={{ fill: '#f59e0b', r: 3 }} name="SLA %" />
-                  <Line type="monotone" dataKey="target" stroke={dark ? 'rgba(255,255,255,.3)' : '#94a3b8'} strokeWidth={1.5} strokeDasharray="5 3" dot={false} name={t.targetLabel} />
+                  <XAxis dataKey="date" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis domain={[0, 100]} unit="%" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => typeof v === 'number' ? `${v.toFixed(1)}%` : v} />
+                  <ReferenceLine y={90} stroke="#f59e0b" strokeDasharray="5 3" label={{ value: t.slaResponseTarget, fill: '#f59e0b', fontSize: 10, position: 'insideTopRight' }} />
+                  <Line type="monotone" dataKey="slaPercentage" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', r: 3 }} name={t.slaResponseLineName} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
-          ) : (
-            <div className={`${dark ? 'border-white/8 text-white/25' : 'border-slate-200 text-slate-400'} border border-dashed rounded-xl px-4 py-3 text-xs`}>{t.insufficient}</div>
           )}
         </div>
+      )}
 
-      </div>
+      {/* ── SLA Tarefas Concluídas no Prazo (resolution-time) ── */}
+      {hasResolutionTime && analytics?.resolutionTime && (
+        <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
+          <div className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-base leading-none">📋</span>
+              <p className={`text-sm font-semibold ${text} truncate`}>{t.slaResolutionTitle}</p>
+            </div>
+            <button
+              onClick={() => setHideResolution(v => !v)}
+              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition flex-shrink-0 ml-2 ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
+            >
+              <span className={`w-2 h-2 rounded-full ${hideResolution ? 'bg-slate-400' : 'bg-emerald-400'}`} />
+              {hideResolution ? t.showLabel : t.hideLabel}
+            </button>
+          </div>
+
+          {!hideResolution && analytics?.resolutionTime && (
+            <div className="px-4 sm:px-5 py-4">
+              {analytics.resolutionTime.data.length === 0 ? (
+                <p className={`text-xs ${textFaint} text-center py-6`}>
+                  {locale === 'pt' ? 'Nenhuma tarefa concluída no prazo registrada ainda.' : 'No tasks completed on time recorded yet.'}
+                </p>
+              ) : (
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={analytics.resolutionTime.data}>
+                  <CartesianGrid stroke={dark ? 'rgba(255,255,255,.06)' : '#e2e8f0'} />
+                  <XAxis dataKey="date" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis domain={[0, 100]} unit="%" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => typeof v === 'number' ? `${v.toFixed(1)}%` : v} />
+                  <ReferenceLine y={90} stroke="#ef4444" strokeDasharray="5 3" label={{ value: t.slaResolutionTarget, fill: '#ef4444', fontSize: 10, position: 'insideTopRight' }} />
+                  <Line type="monotone" dataKey="slaPercentage" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', r: 3 }} name={t.slaResolutionLineName} />
+                </LineChart>
+              </ResponsiveContainer>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
     </div>
   )
 }

@@ -66,13 +66,13 @@ export interface ResponseTimeResponse {
   data: ResponseTimeItem[];
 }
 
-export interface ResolutionTimeMetrics {
+export interface ResolutionTimeItem {
   date: string;
-  onTimeSolution: number;
+  slaPercentage: number;
   target: number;
 }
 
-export interface StandardResolutionTimeResponse {
+export interface ResolutionTimeResponse {
   success: boolean;
-  data: ResolutionTimeMetrics[];
+  data: ResolutionTimeItem[];
 }
