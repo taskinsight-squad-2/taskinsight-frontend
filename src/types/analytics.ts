@@ -65,3 +65,14 @@ export interface ResponseTimeResponse {
   success: boolean;
   data: ResponseTimeItem[];
 }
+
+export interface ResolutionTimeMetrics {
+  date: string;
+  onTimeSolution: number;
+  target: number;
+}
+
+export interface StandardResolutionTimeResponse {
+  success: boolean;
+  data: ResolutionTimeMetrics[];
+}
