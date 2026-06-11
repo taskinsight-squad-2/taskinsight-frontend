@@ -107,9 +107,20 @@ body {
 .animate-pulse-ring { animation: pulse-ring 2.5s ease-in-out infinite; }
 
 /* ── VLibras — botão e painel acima de qualquer elemento do app ── */
-[vw-access-button],
+[vw] {
+  z-index: 10000 !important;
+}
+[vw-access-button] {
+  z-index: 10000 !important;
+}
 [vw-plugin-wrapper] {
   z-index: 10000 !important;
+}
+/* Mobile: safe area para não ficar atrás da barra do iOS/Android */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  [vw-access-button] {
+    margin-bottom: env(safe-area-inset-bottom, 0px) !important;
+  }
 }
 
 /* ── Preferências de acessibilidade ────────────────────────────── */
