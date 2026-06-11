@@ -31,6 +31,18 @@ function uid(u: User): string {
 type StatusFilter   = 'ALL' | 'PENDING' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED' | 'OVERDUE'
 type PriorityFilter = 'ALL' | 'HIGH' | 'MEDIUM' | 'LOW'
 
+// ── Custom Y-axis tick (left-aligned) ─────────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function PriorityYTick(props: any) {
+  const { y = 0, payload, fillColor = '#334155' } = props
+  if (!payload?.value) return null
+  return (
+    <text x={4} y={y + 4} textAnchor="start" fill={fillColor} fontSize={11} fontWeight={700}>
+      {payload.value}
+    </text>
+  )
+}
+
 // ── Tooltip ───────────────────────────────────────────────────────────────────
 function ChartTooltip({ active, payload, label, dark }: {
   active?: boolean
@@ -150,6 +162,20 @@ export default function AdminPage() {
   const nProgress   = tasks.filter(t => t.status === 'IN_PROGRESS' && !(t.dueDate && t.dueDate < today)).length
   const doneRate    = totalTasks > 0 ? Math.round(nDone / totalTasks * 100) : 0
 
+  // SLA: % of tasks created this month that were started within 3 hours — resets on the 1st
+  const slaRate = useMemo(() => {
+    const currentMonth = new Date().toISOString().slice(0, 7) // "YYYY-MM"
+    const started = tasks.filter(t =>
+      !!t.startedAt && !!t.createdAt && t.createdAt.slice(0, 7) === currentMonth
+    )
+    if (!started.length) return null
+    const within = started.filter(t => {
+      const ms = new Date(t.startedAt!).getTime() - new Date(t.createdAt!).getTime()
+      return ms >= 0 && ms <= 3 * 60 * 60 * 1000
+    })
+    return Math.round(within.length / started.length * 100)
+  }, [tasks])
+
   // mapa userId → User (indexa por id, _id e qualquer variação retornada pela API)
   const userMap = useMemo(() => {
     const m: Record<string, User> = {}
@@ -158,6 +184,15 @@ export default function AdminPage() {
       const keys = [u.id, rawU._id, rawU.userId].filter(Boolean) as string[]
       keys.forEach(k => { m[k] = u })
     })
+    // Inclui o próprio admin logado (pode não constar na lista de usuários da API)
+    try {
+      const stored = localStorage.getItem('user')
+      if (stored) {
+        const au = JSON.parse(stored) as Record<string, string>
+        const keys = [au.id, au._id].filter(Boolean)
+        keys.forEach(k => { if (!m[k]) m[k] = au as unknown as User })
+      }
+    } catch {}
     return m
   }, [users])
 
@@ -381,6 +416,13 @@ export default function AdminPage() {
       icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> },
     { label: t.sOverdue,         value: nOverdue,     accent: 'text-orange-500', bg: 'bg-orange-500/10 border-orange-500/20',
       icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> },
+    {
+      label: t.slaCardLabel,
+      value: slaRate !== null ? `${slaRate}%` : '—',
+      accent: slaRate === null ? (dark ? 'text-white/40' : 'text-slate-400') : slaRate >= 90 ? 'text-blue-500' : slaRate >= 70 ? 'text-emerald-500' : 'text-red-500',
+      bg:     slaRate === null ? 'bg-slate-400/10 border-slate-400/20'       : slaRate >= 90 ? 'bg-blue-500/10 border-blue-500/20' : slaRate >= 70 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-red-500/10 border-red-500/20',
+      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>,
+    },
   ]
 
   const statusTabs = [
@@ -523,7 +565,7 @@ export default function AdminPage() {
           <>
             {/* ── Cards de resumo ──────────────────────────────────────────── */}
             <section aria-label="Resumo geral">
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {summaryCards.map(c => (
                   <div key={c.label} className={`${cardBg} border rounded-xl px-3 py-3 flex items-center gap-2.5 transition-colors`}>
                     <div className={`w-7 h-7 rounded-lg ${c.bg} border flex items-center justify-center ${c.accent} flex-shrink-0`}>
@@ -531,7 +573,7 @@ export default function AdminPage() {
                     </div>
                     <div className="min-w-0">
                       <p className={`text-[9px] font-semibold ${textFaint} uppercase tracking-widest truncate`}>{c.label}</p>
-                      <p className={`text-xl font-black ${text} leading-tight tabular-nums`}>{c.value}</p>
+                      <p className={`text-xl font-black leading-tight tabular-nums ${typeof c.value === 'string' ? c.accent : text}`}>{c.value}</p>
                     </div>
                   </div>
                 ))}
@@ -598,8 +640,8 @@ export default function AdminPage() {
                         <XAxis type="number" allowDecimals={false}
                           tick={{ fill: dark ? 'rgba(255,255,255,0.3)' : '#94a3b8', fontSize: 10 }}
                           axisLine={false} tickLine={false}/>
-                        <YAxis type="category" dataKey="label" width={46}
-                          tick={{ fill: dark ? 'rgba(255,255,255,0.65)' : '#334155', fontSize: 11, fontWeight: 700 }}
+                        <YAxis type="category" dataKey="label" width={58}
+                          tick={<PriorityYTick fillColor={dark ? 'rgba(255,255,255,0.65)' : '#334155'}/>}
                           axisLine={false} tickLine={false}/>
                         <Tooltip content={<ChartTooltip dark={dark}/>}
                           cursor={{ fill: dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' }}/>
