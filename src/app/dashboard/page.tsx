@@ -17,7 +17,6 @@ import { DeadlineModal } from '@/components/dashboard/DeadlineModal'
 import { ConfirmStartModal } from '@/components/dashboard/ConfirmStartModal'
 import { PersonalizeModal } from '@/components/dashboard/PersonalizeModal'
 import { TaskItem } from '@/components/dashboard/TaskItem'
-import { ProgressChart } from '@/components/dashboard/ProgressChart'
 import { Analytics } from '@/components/dashboard/Analytics'
 
 function DashboardPage() {
@@ -247,7 +246,7 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
   // ── criar tarefa ─────────────────────────────────────────────────
   const [showPersonalizeModal, setShowPersonalizeModal] = useState(false)
   const [showNewTask, setShowNewTask] = useState(false)
-  const [newTaskForm, setNewTaskForm] = useState({ title: '', description: '', priority: 'MEDIUM' as ApiTask['priority'] })
+  const [newTaskForm, setNewTaskForm] = useState({ title: '', description: '', priority: 'MEDIUM' as ApiTask['priority'], deadline: '' })
   const [savingTask, setSavingTask]   = useState(false)
 
   const trapNewTask  = useFocusTrap(showNewTask)
@@ -256,13 +255,14 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
 
   async function handleCreateTask(e: React.FormEvent) {
     e.preventDefault()
-    if (!newTaskForm.title.trim()) return
+    if (!newTaskForm.title.trim() || !newTaskForm.deadline) return
     setSavingTask(true)
     try {
-      await taskService.create({ title: newTaskForm.title, description: newTaskForm.description, priority: newTaskForm.priority }, token)
-      setNewTaskForm({ title: '', description: '', priority: 'MEDIUM' })
+      await taskService.create({ title: newTaskForm.title, description: newTaskForm.description, priority: newTaskForm.priority, dueDate: newTaskForm.deadline }, token)
+      setNewTaskForm({ title: '', description: '', priority: 'MEDIUM', deadline: '' })
       setShowNewTask(false)
       await fetchTasks()
+      loadAnalytics()
       showToast('✓ Tarefa criada com sucesso!')
     } catch { showToast('Erro ao criar tarefa.') }
     finally { setSavingTask(false) }
@@ -356,7 +356,7 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
 
       {/* modal personalizar experiência */}
       {showPersonalizeModal && (
-        <PersonalizeModal onClose={() => setShowPersonalizeModal(false)} />
+        <PersonalizeModal onClose={() => setShowPersonalizeModal(false)} locale={locale} />
       )}
 
       {/* modal nova tarefa */}
@@ -437,7 +437,7 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
               {/* desktop: Personalizar */}
               <button
                 onClick={() => setShowPersonalizeModal(true)}
-                aria-label="Personalizar experiência de acessibilidade"
+                aria-label={t.personalizeBtn}
                 className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border ${ctrlBg} hover:opacity-80 transition text-xs font-semibold`}>
                 <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
@@ -472,12 +472,12 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
                   Admin
                 </button>
               )}
-              {/* sempre: Sair */}
+              {/* desktop: Sair */}
               <button onClick={handleLogout}
                 aria-label="Sair da conta"
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 transition">
+                className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 transition">
                 <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                <span className="hidden sm:inline">{t.signOut}</span>
+                {t.signOut}
               </button>
               {/* sempre: Nova Tarefa */}
               <button onClick={() => setShowNewTask(true)} aria-label="Criar nova tarefa" className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-xs font-semibold hover:from-violet-500 hover:to-indigo-500 transition shadow-lg shadow-violet-500/25">
@@ -492,7 +492,7 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
             {/* Personalizar */}
             <button
               onClick={() => setShowPersonalizeModal(true)}
-              aria-label="Personalizar experiência"
+              aria-label={t.personalizeBtn}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border ${ctrlBg} hover:opacity-80 transition text-xs font-semibold whitespace-nowrap flex-shrink-0`}>
               <svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
@@ -500,7 +500,7 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
                 <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
                 <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>
               </svg>
-              Personalizar
+              {t.personalizeBtn}
             </button>
             {/* PT/EN toggle */}
             <div className={`flex items-center h-[30px] rounded-lg border ${ctrlBg} overflow-hidden text-xs font-bold flex-shrink-0`}>
@@ -528,6 +528,13 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
                 Admin
               </button>
             )}
+            {/* mobile: Sair */}
+            <button onClick={handleLogout}
+              aria-label="Sair da conta"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-red-500/20 bg-red-500/10 text-red-500 text-xs font-semibold whitespace-nowrap flex-shrink-0 hover:bg-red-500/20 transition">
+              <svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              {t.signOut}
+            </button>
           </div>
         </div>
 
@@ -699,18 +706,6 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
               </div>
             )}
           </div>
-
-          {/* ── Gráfico de acompanhamento ── */}
-          <ProgressChart
-            dark={dark}
-            isClient={isClient}
-            locale={locale}
-            apiTasks={apiTasks}
-            taskDates={taskDates}
-            taskStatuses={taskStatuses}
-            total={total}
-            theme={theme}
-          />
 
           {/* ── Analytics FastAPI ── */}
           {analytics?.status && (
