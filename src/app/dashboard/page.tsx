@@ -321,7 +321,8 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
     if (!newTaskForm.title.trim() || !newTaskForm.deadline) return
     setSavingTask(true)
     try {
-      await taskService.create({ title: newTaskForm.title, description: newTaskForm.description, priority: newTaskForm.priority, dueDate: newTaskForm.deadline }, token)
+      const dueDateIso = new Date(newTaskForm.deadline + 'T12:00:00.000Z').toISOString()
+      await taskService.create({ title: newTaskForm.title, description: newTaskForm.description, priority: newTaskForm.priority, dueDate: dueDateIso }, token)
       setNewTaskForm({ title: '', description: '', priority: 'MEDIUM', deadline: '' })
       setShowNewTask(false)
       await fetchTasks()
