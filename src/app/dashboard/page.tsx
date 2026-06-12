@@ -320,6 +320,10 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
     e.preventDefault()
     if (!newTaskForm.title.trim() || !newTaskForm.deadline) return
     if (!newTaskForm.description.trim()) { showToast('⚠ A descrição é obrigatória.'); return }
+    const titleLower = newTaskForm.title.trim().toLowerCase()
+    if (tasks.some(t => t.title?.toLowerCase() === titleLower)) {
+      showToast('⚠ Você já possui uma tarefa com esse título.'); return
+    }
     setSavingTask(true)
     try {
       await taskService.create({ title: newTaskForm.title, description: newTaskForm.description.trim(), priority: newTaskForm.priority, dueDate: newTaskForm.deadline }, token)
