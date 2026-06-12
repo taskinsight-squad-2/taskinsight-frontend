@@ -17,7 +17,7 @@ interface NewTaskModalProps {
 
 export function NewTaskModal({ dark, locale, trapRef, form, setForm, saving, onSubmit, onClose }: NewTaskModalProps) {
   const t = translations[locale]
-  const today = new Date().toISOString().slice(0, 10)
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
 
   const inputCls = dark
     ? 'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-white/40 outline-none focus:border-violet-500/60 transition'
@@ -46,7 +46,7 @@ export function NewTaskModal({ dark, locale, trapRef, form, setForm, saving, onS
               id="new-task-deadline"
               type="date"
               required
-              min={today}
+              min={tomorrow}
               value={form.deadline}
               onChange={e => setForm(f => ({ ...f, deadline: e.target.value }))}
               style={{ backgroundColor: dark ? '#0D1117' : undefined, colorScheme: dark ? 'dark' : 'light' }}
@@ -57,8 +57,10 @@ export function NewTaskModal({ dark, locale, trapRef, form, setForm, saving, onS
           </div>
 
           <div>
-            <label htmlFor="new-task-desc" className={labelCls}>{t.taskDescLbl}</label>
-            <textarea id="new-task-desc" rows={3} placeholder={t.taskDescPlaceholder} value={form.description}
+            <label htmlFor="new-task-desc" className={labelCls}>
+              {t.taskDescLbl} <span className="text-red-500 ml-0.5">*</span>
+            </label>
+            <textarea id="new-task-desc" rows={3} required placeholder={t.taskDescPlaceholder} value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
               className={`${inputCls} resize-none`} />
           </div>
