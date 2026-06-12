@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import {
-  LineChart, Line,
+  ComposedChart, BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts'
 import type { AnalyticsResult } from '@/types/dashboard'
@@ -42,6 +42,7 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
   const hasThroughput     = (analytics?.throughput?.data.length     ?? 0) > 0
   const hasResponseTime   = (analytics?.responseTime?.data.length   ?? 0) > 0
   const hasResolutionTime = (analytics?.resolutionTime?.data.length ?? 0) > 0
+  const hasBacklog        = (analytics?.backlog?.data.length        ?? 0) > 0
 
   const stMax = st ? Math.max(st.PENDING.count, st.IN_PROGRESS.count, st.DONE.count, st.CANCELLED?.count ?? 0, 1) : 1
   const prMax = pr ? Math.max(pr.HIGH.count, pr.MEDIUM.count, pr.LOW.count, 1) : 1
@@ -176,6 +177,52 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
               </ResponsiveContainer>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Backlog (criadas × finalizadas) ── */}
+      {hasBacklog && (
+        <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
+          <div className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}>
+            <div className="flex items-center gap-2">
+              <span className="text-base leading-none">📊</span>
+              <p className={`text-sm font-semibold ${text}`}>Backlog de Tarefas</p>
+            </div>
+            <div className="flex gap-3">
+              {([
+                { c: '#7c3aed', l: 'Criadas', bar: true },
+                { c: '#10b981', l: 'Finalizadas', bar: true },
+                { c: '#f97316', l: 'Backlog', bar: false },
+              ] as { c: string; l: string; bar: boolean }[]).map(({ c, l, bar }) => (
+                <span key={l} className="flex items-center gap-1">
+                  {bar
+                    ? <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: c }}/>
+                    : <svg width="16" height="3"><line x1="0" y1="1.5" x2="16" y2="1.5" stroke={c} strokeWidth="2"/></svg>
+                  }
+                  <span className={`text-[10px] ${textFaint}`}>{l}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="px-4 sm:px-5 py-4">
+            <ResponsiveContainer width="100%" height={200}>
+              <ComposedChart data={analytics!.backlog!.data}>
+                <CartesianGrid stroke={dark ? 'rgba(255,255,255,.06)' : '#e2e8f0'} vertical={false}/>
+                <XAxis dataKey="date"
+                  tickFormatter={(v: string) => v?.slice(5)?.replace('-', '/')}
+                  tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }}
+                  axisLine={false} tickLine={false}/>
+                <YAxis allowDecimals={false}
+                  tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }}
+                  axisLine={false} tickLine={false}/>
+                <Tooltip contentStyle={tooltipStyle}/>
+                <Bar dataKey="criadas"     name="Criadas"     fill="#7c3aed" radius={[3,3,0,0]} barSize={8}/>
+                <Bar dataKey="finalizadas" name="Finalizadas" fill="#10b981" radius={[3,3,0,0]} barSize={8}/>
+                <Line type="monotone" dataKey="backlog" name="Backlog"
+                  stroke="#f97316" strokeWidth={2} dot={false} activeDot={{ r: 4 }}/>
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       )}
 
