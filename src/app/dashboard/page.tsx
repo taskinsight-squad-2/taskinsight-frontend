@@ -328,7 +328,10 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
       await fetchTasks()
       loadAnalytics()
       showToast('✓ Tarefa criada com sucesso!')
-    } catch { showToast('Erro ao criar tarefa.') }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : ''
+      showToast(`⚠ ${msg && msg.length < 120 ? msg : 'Erro ao criar tarefa.'}`)
+    }
     finally { setSavingTask(false) }
   }
 
