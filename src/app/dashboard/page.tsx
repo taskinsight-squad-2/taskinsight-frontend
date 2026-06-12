@@ -319,10 +319,10 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
   async function handleCreateTask(e: React.FormEvent) {
     e.preventDefault()
     if (!newTaskForm.title.trim() || !newTaskForm.deadline) return
+    if (!newTaskForm.description.trim()) { showToast('⚠ A descrição é obrigatória.'); return }
     setSavingTask(true)
     try {
-      const dueDateIso = new Date(newTaskForm.deadline + 'T12:00:00.000Z').toISOString()
-      await taskService.create({ title: newTaskForm.title, description: newTaskForm.description, priority: newTaskForm.priority, dueDate: dueDateIso }, token)
+      await taskService.create({ title: newTaskForm.title, description: newTaskForm.description.trim(), priority: newTaskForm.priority, dueDate: newTaskForm.deadline }, token)
       setNewTaskForm({ title: '', description: '', priority: 'MEDIUM', deadline: '' })
       setShowNewTask(false)
       await fetchTasks()
