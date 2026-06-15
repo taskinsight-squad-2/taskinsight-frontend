@@ -3,10 +3,12 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  BarChart, Bar,
+  ComposedChart, BarChart, Bar, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { adminService, ApiError } from '@/services/admin.service'
+import { analyticsApi } from '@/services/analytics.service'
+import type { ResolutionTimeItem, BacklogItem } from '@/types/analytics'
 import { useA11yPrefs } from '@/hooks/useA11yPrefs'
 import { translations, type Locale } from '@/lib/i18n'
 import type { Task } from '@/types/task'
@@ -31,13 +33,13 @@ function uid(u: User): string {
 type StatusFilter   = 'ALL' | 'PENDING' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED' | 'OVERDUE'
 type PriorityFilter = 'ALL' | 'HIGH' | 'MEDIUM' | 'LOW'
 
-// ── Custom Y-axis tick (left-aligned) ─────────────────────────────────────────
+// ── Custom Y-axis tick ────────────────────────────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function PriorityYTick(props: any) {
-  const { y = 0, payload, fillColor = '#334155' } = props
+  const { x = 0, y = 0, payload, fillColor = '#334155' } = props
   if (!payload?.value) return null
   return (
-    <text x={4} y={y + 4} textAnchor="start" fill={fillColor} fontSize={11} fontWeight={700}>
+    <text x={x - 6} y={y} dominantBaseline="middle" textAnchor="end" fill={fillColor} fontSize={11} fontWeight={700}>
       {payload.value}
     </text>
   )
@@ -76,8 +78,16 @@ export default function AdminPage() {
 
   const [tasks,        setTasks]        = useState<Task[]>([])
   const [users,        setUsers]        = useState<User[]>([])
+  const [resolutionData, setResolutionData] = useState<ResolutionTimeItem[]>([])
+  const [backlogData,    setBacklogData]    = useState<BacklogItem[]>([])
   const [loading,      setLoading]      = useState(true)
   const [error,        setError]        = useState('')
+
+  // visibilidade dos gráficos
+  const [hideBacklogChart,   setHideBacklogChart]   = useState(false)
+  const [hideSlaChart,       setHideSlaChart]       = useState(false)
+  const [hideWorkloadChart,  setHideWorkloadChart]  = useState(false)
+  const [hidePriorityChart,  setHidePriorityChart]  = useState(false)
   const [userName,     setUserName]     = useState('')
   const [userInitials, setUserInitials] = useState('U')
 
@@ -125,12 +135,34 @@ export default function AdminPage() {
     if (!token) return
     setLoading(true); setError('')
     try {
-      const [allTasks, allUsers] = await Promise.all([
+      const [allTasks, allUsers, backlog, bklog] = await Promise.all([
         adminService.getAllTasks(token),
         adminService.getAllUsers(token),
+        analyticsApi.getResolutionTime(token).catch(() => ({ success: false, data: [] as ResolutionTimeItem[] })),
+        analyticsApi.getBacklog(token).catch(() => ({ success: false, data: [] as BacklogItem[] })),
       ])
       setTasks(Array.isArray(allTasks) ? allTasks : [])
       setUsers(Array.isArray(allUsers) ? allUsers : [])
+      setBacklogData(bklog?.data ?? [])
+
+      // normaliza campo de SLA (FastAPI retorna onTimeSolution, não slaPercentage)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rawRes = (backlog?.data ?? []) as any[]
+      const SLA_CANDIDATES = ['slaPercentage', 'onTimeSolution', 'resolutionPercentage', 'resolution_percentage', 'percentage', 'sla_percentage']
+      setResolutionData(rawRes.map(item => {
+        let pct: number | undefined
+        for (const f of SLA_CANDIDATES) {
+          if (typeof item[f] === 'number') { pct = item[f]; break }
+        }
+        if (pct === undefined) {
+          for (const [k, v] of Object.entries(item as Record<string, unknown>)) {
+            if (typeof v === 'number' && v > 0 && v <= 100 && k !== 'target' && !k.toLowerCase().includes('date')) {
+              pct = v; break
+            }
+          }
+        }
+        return { date: item.date ?? '', slaPercentage: pct ?? 0, target: item.target ?? 90 }
+      }))
     } catch (e: unknown) {
       const isAuthError =
         (e instanceof ApiError && (e.status === 401 || e.status === 403)) ||
@@ -584,39 +616,154 @@ export default function AdminPage() {
               </p>
             </section>
 
-            {/* ── Prioridade × Status ──────────────────────────────────────── */}
-            <section aria-label="Prioridade por status">
-              <div className={`${cardBg} border rounded-2xl p-5 flex flex-col`}>
-                  <div className="mb-5">
-                    <h2 className={`text-sm font-bold ${text}`}>{t.priorityXStatus}</h2>
-                    <p className={`text-[11px] ${textFaint} mt-0.5`}>{t.priorityDist}</p>
+            {/* ── Backlog (criadas × finalizadas) ──────────────────────────── */}
+            <section aria-label="Backlog de tarefas por dia">
+              <div className={`${cardBg} border rounded-2xl p-5`}>
+                <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
+                  <div>
+                    <h2 className={`text-sm font-bold ${text}`}>Backlog de Tarefas</h2>
+                    <p className={`text-[11px] ${textFaint} mt-0.5`}>Criadas × Finalizadas × Acúmulo por dia</p>
+                  </div>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <button onClick={() => setHideBacklogChart(v => !v)}
+                      className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}>
+                      <span className={`w-2 h-2 rounded-full ${hideBacklogChart ? 'bg-slate-400' : 'bg-emerald-400'}`} />
+                      {hideBacklogChart ? t.showLabel : t.hideLabel}
+                    </button>
+                    <div className="flex gap-4 flex-wrap">
+                      {([
+                        { c: '#7c3aed', l: 'Criadas',    bar: true  },
+                        { c: '#10b981', l: 'Finalizadas', bar: true  },
+                        { c: '#f97316', l: 'Backlog',     bar: false },
+                      ] as { c: string; l: string; bar: boolean }[]).map(({ c, l, bar }) => (
+                        <span key={l} className="flex items-center gap-1.5">
+                          {bar
+                            ? <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: c }}/>
+                            : <svg width="20" height="4"><line x1="0" y1="2" x2="20" y2="2" stroke={c} strokeWidth="2.5"/></svg>
+                          }
+                          <span className={`text-[11px] ${textFaint}`}>{l}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {!hideBacklogChart && (backlogData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={240}>
+                    <ComposedChart data={backlogData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={dark ? '#ffffff08' : '#e2e8f0'} vertical={false}/>
+                      <XAxis dataKey="date"
+                        tickFormatter={(v: string) => v?.slice(5)?.replace('-', '/')}
+                        tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }}
+                        axisLine={false} tickLine={false}/>
+                      <YAxis allowDecimals={false}
+                        tick={{ fill: dark ? '#ffffff55' : '#64748b', fontSize: 10 }}
+                        axisLine={false} tickLine={false}/>
+                      <Tooltip content={<ChartTooltip dark={dark}/>}/>
+                      <Bar dataKey="criadas"     name="Criadas"     fill="#7c3aed" radius={[3,3,0,0]} barSize={8}/>
+                      <Bar dataKey="finalizadas" name="Finalizadas" fill="#10b981" radius={[3,3,0,0]} barSize={8}/>
+                      <Line type="monotone" dataKey="backlog" name="Backlog"
+                        stroke="#f97316" strokeWidth={2} dot={false} activeDot={{ r: 4 }}/>
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className={`flex items-center justify-center h-[240px] text-sm ${textFaint}`}>
+                    Sem dados de backlog disponíveis
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* ── SLA de Resolução ─────────────────────────────────────────── */}
+            <section aria-label="Backlog de tarefas">
+              <div className={`${cardBg} border rounded-2xl p-5`}>
+                <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
+                  <div>
+                    <h2 className={`text-sm font-bold ${text}`}>SLA de Resolução (meta 90%)</h2>
+                    <p className={`text-[11px] ${textFaint} mt-0.5`}>Percentual de tarefas resolvidas dentro do prazo por dia</p>
+                  </div>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <button onClick={() => setHideSlaChart(v => !v)}
+                      className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}>
+                      <span className={`w-2 h-2 rounded-full ${hideSlaChart ? 'bg-slate-400' : 'bg-emerald-400'}`} />
+                      {hideSlaChart ? t.showLabel : t.hideLabel}
+                    </button>
+                    <div className="flex gap-4 flex-wrap">
+                      {([
+                        { c: '#7c3aed', l: 'SLA %',  line: false },
+                        { c: '#f43f5e', l: 'Meta',   line: true  },
+                      ] as { c: string; l: string; line: boolean }[]).map(({ c, l, line }) => (
+                        <span key={l} className="flex items-center gap-1.5">
+                          {line
+                            ? <svg width="20" height="4"><line x1="0" y1="2" x2="20" y2="2" stroke={c} strokeWidth="2" strokeDasharray="4 2"/></svg>
+                            : <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: c }}/>
+                          }
+                          <span className={`text-[11px] ${textFaint}`}>{l}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {!hideSlaChart && (resolutionData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={240}>
+                    <ComposedChart data={resolutionData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="gSla" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%"  stopColor="#7c3aed" stopOpacity={0.35}/>
+                          <stop offset="95%" stopColor="#7c3aed" stopOpacity={0.02}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke={dark ? '#ffffff08' : '#e2e8f0'} vertical={false}/>
+                      <XAxis dataKey="date"
+                        tickFormatter={(v: string) => v?.slice(5)?.replace('-', '/')}
+                        tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }}
+                        axisLine={false} tickLine={false}/>
+                      <YAxis domain={[0, 100]} tickFormatter={(v: number) => `${v}%`}
+                        tick={{ fill: dark ? '#ffffff55' : '#64748b', fontSize: 10 }}
+                        axisLine={false} tickLine={false}/>
+                      <Tooltip content={<ChartTooltip dark={dark}/>}/>
+                      <Bar dataKey="slaPercentage" name="SLA %" fill="#7c3aed" radius={[3,3,0,0]} barSize={10}/>
+                      <Line type="monotone" dataKey="target" name="Meta"
+                        stroke="#f43f5e" strokeWidth={1.5} strokeDasharray="5 3" dot={false}/>
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className={`flex items-center justify-center h-[240px] text-sm ${textFaint}`}>
+                    Sem dados de SLA disponíveis
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* ── Carga por Responsável ────────────────────────────────────── */}
+            {userChartData.length > 0 && (
+              <section aria-label="Carga por responsável">
+                <div className={`${cardBg} border rounded-2xl p-5 flex flex-col gap-4`}>
+
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div>
+                      <h2 className={`text-sm font-bold ${text}`}>{t.workloadTitle}</h2>
+                      <p className={`text-[11px] ${textFaint} mt-0.5`}>{t.topActivity(userChartData.length)}</p>
+                    </div>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <button onClick={() => setHideWorkloadChart(v => !v)}
+                        className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}>
+                        <span className={`w-2 h-2 rounded-full ${hideWorkloadChart ? 'bg-slate-400' : 'bg-emerald-400'}`} />
+                        {hideWorkloadChart ? t.showLabel : t.hideLabel}
+                      </button>
+                      <div className={`flex flex-col items-end px-3 py-2 rounded-xl border ${dark ? 'border-white/8 bg-white/[0.03]' : 'border-slate-100 bg-slate-50'}`}>
+                        <span className={`text-[10px] font-semibold ${textFaint} uppercase tracking-widest`}>{t.productivityLbl}</span>
+                        <span className={`text-lg font-black tabular-nums ${doneRate >= 70 ? 'text-emerald-400' : doneRate >= 40 ? 'text-amber-400' : 'text-red-400'}`}>{doneRate}%</span>
+                      </div>
+                      <div className={`flex flex-col items-end px-3 py-2 rounded-xl border ${dark ? 'border-white/8 bg-white/[0.03]' : 'border-slate-100 bg-slate-50'}`}>
+                        <span className={`text-[10px] font-semibold ${textFaint} uppercase tracking-widest`}>{t.avgDelivLbl}</span>
+                        <span className={`text-lg font-black tabular-nums ${text}`}>{overallAvgDays != null ? `${overallAvgDays}d` : '—'}</span>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* mini stats por prioridade */}
-                  <div className="grid grid-cols-3 gap-2 mb-5">
-                    {priorityChartData.map(p => {
-                      const ptotal = (p['Não iniciada'] as number) + (p['Em andamento'] as number) + (p['Concluídas'] as number) + (p['Canceladas'] as number)
-                      const pDone  = p['Concluídas'] as number
-                      const rate   = ptotal > 0 ? Math.round((pDone / ptotal) * 100) : 0
-                      const accent = p.label === t.priorityHigh ? { text: 'text-red-400', bar: '#ef4444', bg: dark ? 'bg-red-500/10 border-red-500/15' : 'bg-red-50 border-red-100' }
-                        : p.label === t.priorityMedium ? { text: 'text-amber-400', bar: '#f59e0b', bg: dark ? 'bg-amber-500/10 border-amber-500/15' : 'bg-amber-50 border-amber-100' }
-                        : { text: 'text-emerald-400', bar: '#10b981', bg: dark ? 'bg-emerald-500/10 border-emerald-500/15' : 'bg-emerald-50 border-emerald-100' }
-                      return (
-                        <div key={p.label} className={`rounded-xl border ${accent.bg} px-3 py-2.5`}>
-                          <p className={`text-[10px] font-bold ${accent.text} uppercase tracking-widest`}>{p.label}</p>
-                          <p className={`text-lg font-black ${text} tabular-nums leading-tight mt-0.5`}>{ptotal}</p>
-                          <div className={`h-1 rounded-full mt-2 ${dark ? 'bg-white/8' : 'bg-black/8'}`}>
-                            <div className="h-full rounded-full transition-all duration-700"
-                              style={{ width: `${rate}%`, backgroundColor: accent.bar }}/>
-                          </div>
-                          <p className={`text-[9px] mt-1 ${textFaint}`}>{rate}{t.pctDone}</p>
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  {/* legenda */}
-                  <div className="flex items-center gap-3 flex-wrap mb-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     {([
                       { c: '#64748b', l: t.sNotStarted },
                       { c: '#3b82f6', l: t.sInProgress },
@@ -631,28 +778,163 @@ export default function AdminPage() {
                     ))}
                   </div>
 
-                  <div className="flex-1 min-h-0">
-                    <ResponsiveContainer width="100%" height={120}>
-                      <BarChart layout="vertical" data={priorityChartData}
-                        margin={{ top: 0, right: 4, left: 0, bottom: 0 }} barSize={16}>
-                        <CartesianGrid strokeDasharray="2 4"
-                          stroke={dark ? 'rgba(255,255,255,0.04)' : '#f1f5f9'} horizontal={false}/>
-                        <XAxis type="number" allowDecimals={false}
-                          tick={{ fill: dark ? 'rgba(255,255,255,0.3)' : '#94a3b8', fontSize: 10 }}
-                          axisLine={false} tickLine={false}/>
-                        <YAxis type="category" dataKey="label" width={58}
-                          tick={<PriorityYTick fillColor={dark ? 'rgba(255,255,255,0.65)' : '#334155'}/>}
-                          axisLine={false} tickLine={false}/>
-                        <Tooltip content={<ChartTooltip dark={dark}/>}
-                          cursor={{ fill: dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' }}/>
-                        <Bar dataKey="Não iniciada" name={t.sNotStarted} stackId="p" fill="#64748b" radius={0}/>
-                        <Bar dataKey="Em andamento" name={t.sInProgress} stackId="p" fill="#3b82f6" radius={0}/>
-                        <Bar dataKey="Em atraso"    name={t.sOverdue}    stackId="p" fill="#f97316" radius={0}/>
-                        <Bar dataKey="Concluídas"   name={t.sDonePlural} stackId="p" fill="#10b981" radius={0}/>
-                        <Bar dataKey="Canceladas"   name={t.sCancelled}  stackId="p" fill="#f43f5e" radius={[0,3,3,0]}/>
-                      </BarChart>
-                    </ResponsiveContainer>
+                  {!hideWorkloadChart && (() => {
+                    const maxTotal = Math.max(...userChartData.map(d => d.total), 10)
+                    const xMax = Math.ceil(maxTotal / 5) * 5 || 10
+                    const xTicks = Array.from({ length: Math.min(7, Math.ceil(xMax / 5) + 1) }, (_, i) => i * 5)
+                    return (
+                      <ResponsiveContainer width="100%" height={Math.max(200, userChartData.length * 34)}>
+                        <BarChart layout="vertical" data={userChartData}
+                          margin={{ top: 0, right: 8, left: 0, bottom: 0 }} barSize={13}>
+                          <CartesianGrid strokeDasharray="2 4"
+                            stroke={dark ? 'rgba(255,255,255,0.04)' : '#f1f5f9'} horizontal={false}/>
+                          <XAxis type="number" allowDecimals={false}
+                            domain={[0, xMax]} ticks={xTicks}
+                            tick={{ fill: dark ? 'rgba(255,255,255,0.3)' : '#94a3b8', fontSize: 10 }}
+                            axisLine={false} tickLine={false}/>
+                          <YAxis type="category" dataKey="name" width={80}
+                            tick={{ fill: dark ? 'rgba(255,255,255,0.65)' : '#334155', fontSize: 11, fontWeight: 500 }}
+                            axisLine={false} tickLine={false}/>
+                          <Tooltip
+                            cursor={{ fill: dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' }}
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            content={({ active, payload, label }: any) => {
+                              if (!active || !payload?.length) return null
+                              const entry = userChartData.find(d => d.name === label)
+                              const total = payload.reduce((s: number, p: { value?: number }) => s + (p.value ?? 0), 0)
+                              return (
+                                <div style={{
+                                  backgroundColor: dark ? '#111827' : '#fff',
+                                  border: `1px solid ${dark ? 'rgba(255,255,255,0.1)' : '#e2e8f0'}`,
+                                  borderRadius: 10, padding: '10px 14px', fontSize: 12,
+                                  boxShadow: dark ? '0 8px 32px rgba(0,0,0,0.6)' : '0 4px 16px rgba(0,0,0,0.1)',
+                                  minWidth: 180,
+                                }}>
+                                  <p style={{ color: dark ? 'rgba(255,255,255,0.9)' : '#1e293b', fontWeight: 700, marginBottom: 8, fontSize: 13 }}>
+                                    {entry?.fullName ?? label}
+                                  </p>
+                                  {payload.map((p: { name?: string; value?: number; fill?: string }, i: number) => p.value ? (
+                                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                                      <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: p.fill, flexShrink: 0 }}/>
+                                      <span style={{ color: dark ? 'rgba(255,255,255,0.55)' : '#64748b', flex: 1 }}>{p.name}</span>
+                                      <span style={{ color: dark ? '#fff' : '#0f172a', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{p.value}</span>
+                                    </div>
+                                  ) : null)}
+                                  <div style={{ borderTop: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : '#f1f5f9'}`, marginTop: 8, paddingTop: 8 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                                      <span style={{ color: dark ? 'rgba(255,255,255,0.4)' : '#94a3b8', fontSize: 11 }}>{t.totalTasksLbl}</span>
+                                      <span style={{ color: dark ? '#fff' : '#0f172a', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{total}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                                      <span style={{ color: dark ? 'rgba(255,255,255,0.4)' : '#94a3b8', fontSize: 11 }}>{t.productivityLbl}</span>
+                                      <span style={{ color: (entry?.productivity ?? 0) >= 70 ? '#10b981' : (entry?.productivity ?? 0) >= 40 ? '#f59e0b' : '#f43f5e', fontWeight: 700 }}>
+                                        {entry?.productivity ?? 0}%
+                                      </span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                      <span style={{ color: dark ? 'rgba(255,255,255,0.4)' : '#94a3b8', fontSize: 11 }}>{t.avgTimeLbl}</span>
+                                      <span style={{ color: dark ? 'rgba(255,255,255,0.8)' : '#475569', fontWeight: 700 }}>
+                                        {entry?.avgDays != null ? `${entry.avgDays} ${t.daysUnit}` : '—'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            }}
+                          />
+                          <Bar dataKey="Não iniciada" name={t.sNotStarted} stackId="s" fill="#64748b" radius={0}/>
+                          <Bar dataKey="Em andamento" name={t.sInProgress} stackId="s" fill="#3b82f6" radius={0}/>
+                          <Bar dataKey="Em atraso"    name={t.sOverdue}    stackId="s" fill="#f97316" radius={0}/>
+                          <Bar dataKey="Concluídas"   name={t.sDonePlural} stackId="s" fill="#10b981" radius={0}/>
+                          <Bar dataKey="Canceladas"   name={t.sCancelled}  stackId="s" fill="#f43f5e" radius={[0,3,3,0]}/>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )
+                  })()}
+                </div>
+              </section>
+            )}
+
+            {/* ── Prioridade × Status ──────────────────────────────────────── */}
+            <section aria-label="Prioridade por status">
+              <div className={`${cardBg} border rounded-2xl p-5 flex flex-col`}>
+                  <div className="flex items-start justify-between gap-3 flex-wrap mb-5">
+                    <div>
+                      <h2 className={`text-sm font-bold ${text}`}>{t.priorityXStatus}</h2>
+                      <p className={`text-[11px] ${textFaint} mt-0.5`}>{t.priorityDist}</p>
+                    </div>
+                    <button onClick={() => setHidePriorityChart(v => !v)}
+                      className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}>
+                      <span className={`w-2 h-2 rounded-full ${hidePriorityChart ? 'bg-slate-400' : 'bg-emerald-400'}`} />
+                      {hidePriorityChart ? t.showLabel : t.hideLabel}
+                    </button>
                   </div>
+
+                  {!hidePriorityChart && (
+                    <>
+                      {/* mini stats por prioridade */}
+                      <div className="grid grid-cols-3 gap-2 mb-5">
+                        {priorityChartData.map(p => {
+                          const ptotal = (p['Não iniciada'] as number) + (p['Em andamento'] as number) + (p['Concluídas'] as number) + (p['Canceladas'] as number)
+                          const pDone  = p['Concluídas'] as number
+                          const rate   = ptotal > 0 ? Math.round((pDone / ptotal) * 100) : 0
+                          const accent = p.label === t.priorityHigh ? { text: 'text-red-400', bar: '#ef4444', bg: dark ? 'bg-red-500/10 border-red-500/15' : 'bg-red-50 border-red-100' }
+                            : p.label === t.priorityMedium ? { text: 'text-amber-400', bar: '#f59e0b', bg: dark ? 'bg-amber-500/10 border-amber-500/15' : 'bg-amber-50 border-amber-100' }
+                            : { text: 'text-emerald-400', bar: '#10b981', bg: dark ? 'bg-emerald-500/10 border-emerald-500/15' : 'bg-emerald-50 border-emerald-100' }
+                          return (
+                            <div key={p.label} className={`rounded-xl border ${accent.bg} px-3 py-2.5`}>
+                              <p className={`text-[10px] font-bold ${accent.text} uppercase tracking-widest`}>{p.label}</p>
+                              <p className={`text-lg font-black ${text} tabular-nums leading-tight mt-0.5`}>{ptotal}</p>
+                              <div className={`h-1 rounded-full mt-2 ${dark ? 'bg-white/8' : 'bg-black/8'}`}>
+                                <div className="h-full rounded-full transition-all duration-700"
+                                  style={{ width: `${rate}%`, backgroundColor: accent.bar }}/>
+                              </div>
+                              <p className={`text-[9px] mt-1 ${textFaint}`}>{rate}{t.pctDone}</p>
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      {/* legenda */}
+                      <div className="flex items-center gap-3 flex-wrap mb-3">
+                        {([
+                          { c: '#64748b', l: t.sNotStarted },
+                          { c: '#3b82f6', l: t.sInProgress },
+                          { c: '#f97316', l: t.sOverdue    },
+                          { c: '#10b981', l: t.sDonePlural },
+                          { c: '#f43f5e', l: t.sCancelled  },
+                        ] as { c: string; l: string }[]).map(({ c, l }) => (
+                          <span key={l} className="flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: c }}/>
+                            <span className={`text-[10px] font-medium ${textFaint}`}>{l}</span>
+                          </span>
+                        ))}
+                      </div>
+
+                      <div className="flex-1 min-h-0">
+                        <ResponsiveContainer width="100%" height={120}>
+                          <BarChart layout="vertical" data={priorityChartData}
+                            margin={{ top: 0, right: 4, left: 0, bottom: 0 }} barSize={16}>
+                            <CartesianGrid strokeDasharray="2 4"
+                              stroke={dark ? 'rgba(255,255,255,0.04)' : '#f1f5f9'} horizontal={false}/>
+                            <XAxis type="number" allowDecimals={false}
+                              tick={{ fill: dark ? 'rgba(255,255,255,0.3)' : '#94a3b8', fontSize: 10 }}
+                              axisLine={false} tickLine={false}/>
+                            <YAxis type="category" dataKey="label" width={58}
+                              tick={<PriorityYTick fillColor={dark ? 'rgba(255,255,255,0.65)' : '#334155'}/>}
+                              axisLine={false} tickLine={false}/>
+                            <Tooltip content={<ChartTooltip dark={dark}/>}
+                              cursor={{ fill: dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' }}/>
+                            <Bar dataKey="Não iniciada" name={t.sNotStarted} stackId="p" fill="#64748b" radius={0}/>
+                            <Bar dataKey="Em andamento" name={t.sInProgress} stackId="p" fill="#3b82f6" radius={0}/>
+                            <Bar dataKey="Em atraso"    name={t.sOverdue}    stackId="p" fill="#f97316" radius={0}/>
+                            <Bar dataKey="Concluídas"   name={t.sDonePlural} stackId="p" fill="#10b981" radius={0}/>
+                            <Bar dataKey="Canceladas"   name={t.sCancelled}  stackId="p" fill="#f43f5e" radius={[0,3,3,0]}/>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </>
+                  )}
                 </div>
             </section>
 

@@ -11,9 +11,7 @@ import {
 const BASE_URL = process.env.NEXT_PUBLIC_ANALYTICS_API_URL ?? "";
 
 if (!BASE_URL) {
-  console.warn(
-    "NEXT_PUBLIC_ANALYTICS_API_URL não está definida. Analytics desabilitado.",
-  );
+  console.warn("NEXT_PUBLIC_ANALYTICS_API_URL não está definida. Analytics desabilitado.");
 }
 
 async function fetchMetrics<T>(endpoint: string, token?: string): Promise<T> {

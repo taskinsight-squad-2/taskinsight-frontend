@@ -70,4 +70,20 @@ export const authService = {
       throw new Error(json?.message || "Erro ao enviar email");
     }
   },
+
+  resetPassword: async (token: string, password: string): Promise<void> => {
+    if (!BASE_URL)
+      throw new Error("NEXT_PUBLIC_NODE_API_URL não está definido");
+
+    const response = await fetch(`${BASE_URL}/api/users/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, password }),
+    });
+
+    const json = await response.json();
+    if (!response.ok) {
+      throw new Error(json?.message || "Erro ao redefinir senha");
+    }
+  },
 };
