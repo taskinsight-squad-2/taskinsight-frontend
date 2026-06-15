@@ -368,7 +368,7 @@ const [a11yAnnounce, setA11yAnnounce] = useState('')
         </div>
 
         <p className={`relative text-xs ${textFaint}`}>
-          © 2025 TaskFlow. All rights reserved.
+          © 2026 TaskFlow. All rights reserved.
         </p>
       </div>
 
