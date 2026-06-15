@@ -63,9 +63,12 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
       {/* ── Overview: status + priority + avg time ── */}
       <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
         <div className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}>
-          <div className="flex items-center gap-2">
-            <span className="text-base leading-none">📊</span>
-            <p className={`text-sm font-semibold ${text}`}>{t.metricsTitle}</p>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-base leading-none flex-shrink-0">📊</span>
+            <div className="min-w-0">
+              <p className={`text-sm font-semibold ${text}`}>{t.metricsTitle}</p>
+              <p className={`text-[11px] ${textFaint} mt-0.5`}>{t.metricsDesc}</p>
+            </div>
           </div>
           <button
             onClick={() => setHideOverview(v => !v)}
@@ -152,17 +155,26 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
       {hasThroughput && (
         <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
           <div className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}>
-            <div className="flex items-center gap-2">
-              <span className="text-base leading-none">📈</span>
-              <p className={`text-sm font-semibold ${text}`}>{t.dailyProductivity}</p>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-base leading-none flex-shrink-0">📈</span>
+              <div className="min-w-0">
+                <p className={`text-sm font-semibold ${text}`}>{t.dailyProductivity}</p>
+                <p className={`text-[11px] ${textFaint} mt-0.5`}>{t.dailyProductivityDesc}</p>
+              </div>
             </div>
-            <button
-              onClick={() => setHideChart(v => !v)}
-              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
-            >
-              <span className={`w-2 h-2 rounded-full ${hideChart ? 'bg-slate-400' : 'bg-emerald-400'}`} />
-              {hideChart ? t.showLabel : t.hideLabel}
-            </button>
+            <div className="flex items-center gap-3 flex-wrap justify-end">
+              <button
+                onClick={() => setHideChart(v => !v)}
+                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition flex-shrink-0 ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
+              >
+                <span className={`w-2 h-2 rounded-full ${hideChart ? 'bg-slate-400' : 'bg-emerald-400'}`} />
+                {hideChart ? t.showLabel : t.hideLabel}
+              </button>
+              <span className="flex items-center gap-1">
+                <svg width="16" height="3"><line x1="0" y1="1.5" x2="16" y2="1.5" stroke="#7c3aed" strokeWidth="2"/></svg>
+                <span className={`text-[10px] ${textFaint}`}>{t.sDonePlural}</span>
+              </span>
+            </div>
           </div>
 
           {!hideChart && analytics?.throughput && (
@@ -185,9 +197,12 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
       {hasBacklog && (
         <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
           <div className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}>
-            <div className="flex items-center gap-2">
-              <span className="text-base leading-none">📊</span>
-              <p className={`text-sm font-semibold ${text}`}>Backlog de Tarefas</p>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-base leading-none flex-shrink-0">📊</span>
+              <div className="min-w-0">
+                <p className={`text-sm font-semibold ${text}`}>{t.backlogChartTitle}</p>
+                <p className={`text-[11px] ${textFaint} mt-0.5`}>{t.backlogChartDesc}</p>
+              </div>
             </div>
             <div className="flex items-center gap-3 flex-wrap justify-end">
               <button onClick={() => setHideBacklog(v => !v)}
@@ -241,16 +256,29 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
         <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
           <div className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}>
             <div className="flex items-center gap-2 min-w-0">
-              <span className="text-base leading-none">⏱</span>
-              <p className={`text-sm font-semibold ${text} truncate`}>{t.slaResponseTitle}</p>
+              <span className="text-base leading-none flex-shrink-0">⏱</span>
+              <div className="min-w-0">
+                <p className={`text-sm font-semibold ${text} truncate`}>{t.slaResponseTitle}</p>
+                <p className={`text-[11px] ${textFaint} mt-0.5`}>{t.slaResponseDesc}</p>
+              </div>
             </div>
-            <button
-              onClick={() => setHideSla(v => !v)}
-              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition flex-shrink-0 ml-2 ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
-            >
-              <span className={`w-2 h-2 rounded-full ${hideSla ? 'bg-slate-400' : 'bg-emerald-400'}`} />
-              {hideSla ? t.showLabel : t.hideLabel}
-            </button>
+            <div className="flex items-center gap-3 flex-wrap justify-end">
+              <button
+                onClick={() => setHideSla(v => !v)}
+                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition flex-shrink-0 ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
+              >
+                <span className={`w-2 h-2 rounded-full ${hideSla ? 'bg-slate-400' : 'bg-emerald-400'}`} />
+                {hideSla ? t.showLabel : t.hideLabel}
+              </button>
+              <span className="flex items-center gap-1">
+                <svg width="16" height="3"><line x1="0" y1="1.5" x2="16" y2="1.5" stroke="#10b981" strokeWidth="2"/></svg>
+                <span className={`text-[10px] ${textFaint}`}>SLA %</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <svg width="16" height="3"><line x1="0" y1="1.5" x2="16" y2="1.5" stroke="#f59e0b" strokeWidth="2" strokeDasharray="4 2"/></svg>
+                <span className={`text-[10px] ${textFaint}`}>Meta 90%</span>
+              </span>
+            </div>
           </div>
 
           {!hideSla && analytics?.responseTime && (
@@ -275,16 +303,29 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
         <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
           <div className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}>
             <div className="flex items-center gap-2 min-w-0">
-              <span className="text-base leading-none">📋</span>
-              <p className={`text-sm font-semibold ${text} truncate`}>{t.slaResolutionTitle}</p>
+              <span className="text-base leading-none flex-shrink-0">📋</span>
+              <div className="min-w-0">
+                <p className={`text-sm font-semibold ${text} truncate`}>{t.slaResolutionTitle}</p>
+                <p className={`text-[11px] ${textFaint} mt-0.5`}>{t.slaResolutionDesc}</p>
+              </div>
             </div>
-            <button
-              onClick={() => setHideResolution(v => !v)}
-              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition flex-shrink-0 ml-2 ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
-            >
-              <span className={`w-2 h-2 rounded-full ${hideResolution ? 'bg-slate-400' : 'bg-emerald-400'}`} />
-              {hideResolution ? t.showLabel : t.hideLabel}
-            </button>
+            <div className="flex items-center gap-3 flex-wrap justify-end">
+              <button
+                onClick={() => setHideResolution(v => !v)}
+                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition flex-shrink-0 ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
+              >
+                <span className={`w-2 h-2 rounded-full ${hideResolution ? 'bg-slate-400' : 'bg-emerald-400'}`} />
+                {hideResolution ? t.showLabel : t.hideLabel}
+              </button>
+              <span className="flex items-center gap-1">
+                <svg width="16" height="3"><line x1="0" y1="1.5" x2="16" y2="1.5" stroke="#10b981" strokeWidth="2"/></svg>
+                <span className={`text-[10px] ${textFaint}`}>SLA %</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <svg width="16" height="3"><line x1="0" y1="1.5" x2="16" y2="1.5" stroke="#ef4444" strokeWidth="2" strokeDasharray="4 2"/></svg>
+                <span className={`text-[10px] ${textFaint}`}>Meta 90%</span>
+              </span>
+            </div>
           </div>
 
           {!hideResolution && analytics?.resolutionTime && (
