@@ -6,12 +6,16 @@ import {
   BacklogResponse,
   ResponseTimeResponse,
   ResolutionTimeResponse,
+  ResponseTimeMesResponse,
+  ResolutionTimeMesResponse,
 } from "@/types/analytics";
 
 const BASE_URL = process.env.NEXT_PUBLIC_ANALYTICS_API_URL ?? "";
 
 if (!BASE_URL) {
-  console.warn("NEXT_PUBLIC_ANALYTICS_API_URL não está definida. Analytics desabilitado.");
+  console.warn(
+    "NEXT_PUBLIC_ANALYTICS_API_URL não está definida. Analytics desabilitado.",
+  );
 }
 
 async function fetchMetrics<T>(endpoint: string, token?: string): Promise<T> {
@@ -54,6 +58,21 @@ export const analyticsApi = {
   getResponseTime: (token?: string) =>
     fetchMetrics<ResponseTimeResponse>("/task/metrics/response-time", token),
 
+  getResponseTimeMes: (token?: string) =>
+    fetchMetrics<ResponseTimeMesResponse>(
+      "/task/metrics/response-time-mes",
+      token,
+    ),
+
   getResolutionTime: (token?: string) =>
-    fetchMetrics<ResolutionTimeResponse>("/task/metrics/resolution-time", token),
+    fetchMetrics<ResolutionTimeResponse>(
+      "/task/metrics/resolution-time",
+      token,
+    ),
+
+  getResolutionTimeMes: (token?: string) =>
+    fetchMetrics<ResolutionTimeMesResponse>(
+      "/task/metrics/resolution-time-mes",
+      token,
+    ),
 };
