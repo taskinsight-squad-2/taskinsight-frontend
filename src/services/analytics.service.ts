@@ -13,7 +13,9 @@ import {
 const BASE_URL = process.env.NEXT_PUBLIC_ANALYTICS_API_URL ?? "";
 
 if (!BASE_URL) {
-  console.warn("NEXT_PUBLIC_ANALYTICS_API_URL não está definida. Analytics desabilitado.");
+  console.warn(
+    "NEXT_PUBLIC_ANALYTICS_API_URL não está definida. Analytics desabilitado.",
+  );
 }
 
 async function fetchMetrics<T>(endpoint: string, token?: string): Promise<T> {
@@ -60,8 +62,8 @@ export const analyticsApi = {
     fetchMetrics<ResolutionTimeResponse>("/task/metrics/resolution-time", token),
 
   getResponseTimeMonthly: (token?: string) =>
-    fetchMetrics<ResponseTimeMonthlyResponse>("/task/metrics/response-time/monthly", token),
+    fetchMetrics<ResponseTimeMonthlyResponse>("/task/metrics/response-time-mes", token),
 
   getResolutionTimeMonthly: (token?: string) =>
-    fetchMetrics<ResolutionTimeMonthlyResponse>("/task/metrics/resolution-time/monthly", token),
+    fetchMetrics<ResolutionTimeMonthlyResponse>("/task/metrics/resolution-time-mes", token),
 };
