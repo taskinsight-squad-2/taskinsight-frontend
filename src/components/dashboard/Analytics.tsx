@@ -31,19 +31,23 @@ function MiniBar({ value, max, color }: { value: number; max: number; color: str
 export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
   const { text, textFaint, cardBg } = theme
   const t = translations[locale]
-  const [hideOverview, setHideOverview] = useState(false)
-  const [hideChart, setHideChart] = useState(false)
-  const [hideBacklog, setHideBacklog] = useState(false)
-  const [hideSla, setHideSla] = useState(false)
-  const [hideResolution, setHideResolution] = useState(false)
+  const [hideOverview,             setHideOverview]             = useState(false)
+  const [hideChart,                setHideChart]                = useState(false)
+  const [hideBacklog,              setHideBacklog]              = useState(false)
+  const [hideSla,                  setHideSla]                  = useState(false)
+  const [hideResolution,           setHideResolution]           = useState(false)
+  const [hideResponseMonthly,      setHideResponseMonthly]      = useState(false)
+  const [hideResolutionMonthly,    setHideResolutionMonthly]    = useState(false)
 
   const st  = analytics?.status?.data
   const pr  = analytics?.priority?.data
   const atd = analytics?.averageTime?.data
-  const hasThroughput     = (analytics?.throughput?.data.length     ?? 0) > 0
-  const hasResponseTime   = (analytics?.responseTime?.data.length   ?? 0) > 0
-  const hasResolutionTime = (analytics?.resolutionTime?.data.length ?? 0) > 0
-  const hasBacklog        = (analytics?.backlog?.data.length        ?? 0) > 0
+  const hasThroughput              = (analytics?.throughput?.data.length              ?? 0) > 0
+  const hasResponseTime            = (analytics?.responseTime?.data.length            ?? 0) > 0
+  const hasResolutionTime          = (analytics?.resolutionTime?.data.length          ?? 0) > 0
+  const hasBacklog                 = (analytics?.backlog?.data.length                 ?? 0) > 0
+  const hasResponseTimeMonthly     = (analytics?.responseTimeMonthly?.data.length     ?? 0) > 0
+  const hasResolutionTimeMonthly   = (analytics?.resolutionTimeMonthly?.data.length   ?? 0) > 0
 
   const stMax = st ? Math.max(st.PENDING.count, st.IN_PROGRESS.count, st.DONE.count, st.CANCELLED?.count ?? 0, 1) : 1
   const prMax = pr ? Math.max(pr.HIGH.count, pr.MEDIUM.count, pr.LOW.count, 1) : 1
@@ -89,7 +93,7 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
                 {/* Status */}
                 {st && (
                   <div>
-                    <p className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`}>{t.byStatus}</p>
+                    <p className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`} aria-hidden="true">{t.byStatus}</p>
                     <div className="flex flex-col gap-2.5">
                       {[
                         { label: t.statusPending, value: st.PENDING.count,     color: dark ? '#94a3b8' : '#64748b' },
@@ -97,8 +101,11 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
                         { label: t.statusDone,    value: st.DONE.count,        color: '#10b981' },
                         ...(st.CANCELLED ? [{ label: t.sCancelled, value: st.CANCELLED.count, color: '#f43f5e' }] : []),
                       ].map(r => (
-                        <div key={r.label}>
-                          <span className={`text-[11px] ${textFaint} block mb-0.5`}>{r.label}</span>
+                        <div key={r.label}
+                          aria-label={`${r.label}: ${r.value} ${locale === 'pt' ? 'tarefas' : 'tasks'}`}
+                          tabIndex={0}
+                          className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-500 rounded">
+                          <span className={`text-[11px] ${textFaint} block mb-0.5`} aria-hidden="true">{r.label}</span>
                           <MiniBar value={r.value} max={stMax} color={r.color} />
                         </div>
                       ))}
@@ -109,15 +116,18 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
                 {/* Priority */}
                 {pr && (
                   <div>
-                    <p className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`}>{t.byPriority}</p>
+                    <p className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`} aria-hidden="true">{t.byPriority}</p>
                     <div className="flex flex-col gap-2.5">
                       {[
                         { label: t.priorityHigh,   value: pr.HIGH.count,   color: '#ef4444' },
                         { label: t.priorityMedium, value: pr.MEDIUM.count, color: '#f59e0b' },
                         { label: t.priorityLow,    value: pr.LOW.count,    color: '#10b981' },
                       ].map(r => (
-                        <div key={r.label}>
-                          <span className={`text-[11px] ${textFaint} block mb-0.5`}>{r.label}</span>
+                        <div key={r.label}
+                          aria-label={`${r.label}: ${r.value} ${locale === 'pt' ? 'tarefas' : 'tasks'}`}
+                          tabIndex={0}
+                          className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-500 rounded">
+                          <span className={`text-[11px] ${textFaint} block mb-0.5`} aria-hidden="true">{r.label}</span>
                           <MiniBar value={r.value} max={prMax} color={r.color} />
                         </div>
                       ))}
@@ -127,12 +137,15 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
 
                 {/* Avg time */}
                 {atd && (
-                  <div>
-                    <p className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`}>{t.avgCompletionLbl}</p>
-                    <p className={`text-3xl font-black ${text} tabular-nums leading-none mb-3`}>
+                  <div
+                    aria-label={`${t.avgCompletionLbl}: ${atd.average_time_hours.toFixed(1)} ${locale === 'pt' ? 'horas' : 'hours'}, ${atd.average_time_days.toFixed(2)} ${t.daysLabel.toLowerCase()}, ${Math.round(atd.average_time_hours * 60)} ${locale === 'pt' ? 'minutos' : 'minutes'}`}
+                    tabIndex={0}
+                    className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-500 rounded">
+                    <p className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`} aria-hidden="true">{t.avgCompletionLbl}</p>
+                    <p className={`text-3xl font-black ${text} tabular-nums leading-none mb-3`} aria-hidden="true">
                       {atd.average_time_hours.toFixed(1)}<span className={`text-lg font-semibold ${textFaint} ml-0.5`}>h</span>
                     </p>
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1.5" aria-hidden="true">
                       <div className="flex items-baseline gap-1.5">
                         <span className={`text-base font-bold ${text} tabular-nums`}>{atd.average_time_days.toFixed(2)}</span>
                         <span className={`text-[11px] ${textFaint}`}>{t.daysLabel.toLowerCase()}</span>
@@ -346,6 +359,100 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
                 </LineChart>
               </ResponsiveContainer>
               )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── SLA Atendimento Inicial / Mês (response-time monthly) ── */}
+      {hasResponseTimeMonthly && (
+        <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
+          <div className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-base leading-none flex-shrink-0">⏱</span>
+              <div className="min-w-0">
+                <p className={`text-sm font-semibold ${text} truncate`}>{t.slaResponseMonthlyTitle}</p>
+                <p className={`text-[11px] ${textFaint} mt-0.5`}>{t.slaResponseMonthlyDesc}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 flex-wrap justify-end">
+              <button
+                onClick={() => setHideResponseMonthly(v => !v)}
+                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition flex-shrink-0 ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
+              >
+                <span className={`w-2 h-2 rounded-full ${hideResponseMonthly ? 'bg-slate-400' : 'bg-emerald-400'}`} />
+                {hideResponseMonthly ? t.showLabel : t.hideLabel}
+              </button>
+              <span className="flex items-center gap-1">
+                <svg width="16" height="3"><line x1="0" y1="1.5" x2="16" y2="1.5" stroke="#10b981" strokeWidth="2"/></svg>
+                <span className={`text-[10px] ${textFaint}`}>{t.slaResponseMonthlyLineName}</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <svg width="16" height="3"><line x1="0" y1="1.5" x2="16" y2="1.5" stroke="#f59e0b" strokeWidth="2" strokeDasharray="4 2"/></svg>
+                <span className={`text-[10px] ${textFaint}`}>{t.slaResponseMonthlyTarget}</span>
+              </span>
+            </div>
+          </div>
+
+          {!hideResponseMonthly && analytics?.responseTimeMonthly && (
+            <div className="px-4 sm:px-5 py-4">
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={analytics.responseTimeMonthly.data}>
+                  <CartesianGrid stroke={dark ? 'rgba(255,255,255,.06)' : '#e2e8f0'} />
+                  <XAxis dataKey="month" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis domain={[0, 100]} unit="%" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => typeof v === 'number' ? `${v.toFixed(1)}%` : v} />
+                  <ReferenceLine y={90} stroke="#f59e0b" strokeDasharray="5 3" label={{ value: t.slaResponseMonthlyTarget, fill: '#f59e0b', fontSize: 10, position: 'insideTopRight' }} />
+                  <Line type="monotone" dataKey="slaPercentage" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', r: 3 }} name={t.slaResponseMonthlyLineName} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── SLA Tarefas Concluídas no Prazo / Mês (resolution-time monthly) ── */}
+      {hasResolutionTimeMonthly && (
+        <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
+          <div className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-base leading-none flex-shrink-0">📋</span>
+              <div className="min-w-0">
+                <p className={`text-sm font-semibold ${text} truncate`}>{t.slaResolutionMonthlyTitle}</p>
+                <p className={`text-[11px] ${textFaint} mt-0.5`}>{t.slaResolutionMonthlyDesc}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 flex-wrap justify-end">
+              <button
+                onClick={() => setHideResolutionMonthly(v => !v)}
+                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition flex-shrink-0 ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
+              >
+                <span className={`w-2 h-2 rounded-full ${hideResolutionMonthly ? 'bg-slate-400' : 'bg-emerald-400'}`} />
+                {hideResolutionMonthly ? t.showLabel : t.hideLabel}
+              </button>
+              <span className="flex items-center gap-1">
+                <svg width="16" height="3"><line x1="0" y1="1.5" x2="16" y2="1.5" stroke="#10b981" strokeWidth="2"/></svg>
+                <span className={`text-[10px] ${textFaint}`}>{t.slaResolutionMonthlyLineName}</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <svg width="16" height="3"><line x1="0" y1="1.5" x2="16" y2="1.5" stroke="#ef4444" strokeWidth="2" strokeDasharray="4 2"/></svg>
+                <span className={`text-[10px] ${textFaint}`}>{t.slaResolutionMonthlyTarget}</span>
+              </span>
+            </div>
+          </div>
+
+          {!hideResolutionMonthly && analytics?.resolutionTimeMonthly && (
+            <div className="px-4 sm:px-5 py-4">
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={analytics.resolutionTimeMonthly.data}>
+                  <CartesianGrid stroke={dark ? 'rgba(255,255,255,.06)' : '#e2e8f0'} />
+                  <XAxis dataKey="month" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis domain={[0, 100]} unit="%" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => typeof v === 'number' ? `${v.toFixed(1)}%` : v} />
+                  <ReferenceLine y={90} stroke="#ef4444" strokeDasharray="5 3" label={{ value: t.slaResolutionMonthlyTarget, fill: '#ef4444', fontSize: 10, position: 'insideTopRight' }} />
+                  <Line type="monotone" dataKey="slaPercentage" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', r: 3 }} name={t.slaResolutionMonthlyLineName} />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
           )}
         </div>

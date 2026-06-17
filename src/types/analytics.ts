@@ -76,3 +76,25 @@ export interface ResolutionTimeResponse {
   success: boolean;
   data: ResolutionTimeItem[];
 }
+
+export interface ResponseTimeMonthlyItem {
+  month: string;
+  slaPercentage: number;
+  target: number;
+}
+
+export interface ResponseTimeMonthlyResponse {
+  success: boolean;
+  data: ResponseTimeMonthlyItem[];
+}
+
+export interface ResolutionTimeMonthlyItem {
+  month: string;
+  slaPercentage: number;
+  target: number;
+}
+
+export interface ResolutionTimeMonthlyResponse {
+  success: boolean;
+  data: ResolutionTimeMonthlyItem[];
+}

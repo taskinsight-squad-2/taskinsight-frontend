@@ -8,8 +8,9 @@ import {
 } from 'recharts'
 import { adminService, ApiError } from '@/services/admin.service'
 import { analyticsApi } from '@/services/analytics.service'
-import type { ResolutionTimeItem, BacklogItem, ThroughputItem, ResponseTimeItem } from '@/types/analytics'
+import type { ResolutionTimeItem, BacklogItem, ThroughputItem, ResponseTimeItem, ResponseTimeMonthlyItem, ResolutionTimeMonthlyItem } from '@/types/analytics'
 import { useA11yPrefs } from '@/hooks/useA11yPrefs'
+import { useSpeechReader } from '@/hooks/useSpeechReader'
 import { translations, type Locale } from '@/lib/i18n'
 import type { Task } from '@/types/task'
 import type { User } from '@/types/user'
@@ -74,24 +75,28 @@ export default function AdminPage() {
   const router = useRouter()
   const { prefs, set: setPrefs } = useA11yPrefs()
   const dark = prefs.darkMode
-
+  useSpeechReader(prefs.speechMode)
 
   const [tasks,        setTasks]        = useState<Task[]>([])
   const [users,        setUsers]        = useState<User[]>([])
   const [resolutionData,   setResolutionData]   = useState<ResolutionTimeItem[]>([])
   const [backlogData,      setBacklogData]      = useState<BacklogItem[]>([])
-  const [throughputData,   setThroughputData]   = useState<ThroughputItem[]>([])
-  const [responseTimeData, setResponseTimeData] = useState<ResponseTimeItem[]>([])
+  const [throughputData,          setThroughputData]          = useState<ThroughputItem[]>([])
+  const [responseTimeData,        setResponseTimeData]        = useState<ResponseTimeItem[]>([])
+  const [responseTimeMonthlyData, setResponseTimeMonthlyData] = useState<ResponseTimeMonthlyItem[]>([])
+  const [resolutionTimeMonthlyData, setResolutionTimeMonthlyData] = useState<ResolutionTimeMonthlyItem[]>([])
   const [loading,      setLoading]      = useState(true)
   const [error,        setError]        = useState('')
 
   // visibilidade dos gráficos
-  const [hideBacklogChart,      setHideBacklogChart]      = useState(false)
-  const [hideThroughputChart,   setHideThroughputChart]   = useState(false)
-  const [hideResponseTimeChart, setHideResponseTimeChart] = useState(false)
-  const [hideSlaChart,          setHideSlaChart]          = useState(false)
-  const [hideWorkloadChart,     setHideWorkloadChart]     = useState(false)
-  const [hidePriorityChart,     setHidePriorityChart]     = useState(false)
+  const [hideBacklogChart,               setHideBacklogChart]               = useState(false)
+  const [hideThroughputChart,            setHideThroughputChart]            = useState(false)
+  const [hideResponseTimeChart,          setHideResponseTimeChart]          = useState(false)
+  const [hideSlaChart,                   setHideSlaChart]                   = useState(false)
+  const [hideResponseTimeMonthlyChart,   setHideResponseTimeMonthlyChart]   = useState(false)
+  const [hideResolutionTimeMonthlyChart, setHideResolutionTimeMonthlyChart] = useState(false)
+  const [hideWorkloadChart,              setHideWorkloadChart]              = useState(false)
+  const [hidePriorityChart,              setHidePriorityChart]              = useState(false)
   const [userName,     setUserName]     = useState('')
   const [userInitials, setUserInitials] = useState('U')
 
@@ -139,19 +144,23 @@ export default function AdminPage() {
     if (!token) return
     setLoading(true); setError('')
     try {
-      const [allTasks, allUsers, backlog, bklog, throughput, responseTime] = await Promise.all([
+      const [allTasks, allUsers, backlog, bklog, throughput, responseTime, responseTimeMonthly, resolutionTimeMonthly] = await Promise.all([
         adminService.getAllTasks(token),
         adminService.getAllUsers(token),
         analyticsApi.getResolutionTime(token).catch(() => ({ success: false, data: [] as ResolutionTimeItem[] })),
         analyticsApi.getBacklog(token).catch(() => ({ success: false, data: [] as BacklogItem[] })),
         analyticsApi.getThroughput(token).catch(() => ({ success: false, data: [] as ThroughputItem[] })),
         analyticsApi.getResponseTime(token).catch(() => ({ success: false, data: [] as ResponseTimeItem[] })),
+        analyticsApi.getResponseTimeMonthly(token).catch(() => ({ success: false, data: [] as ResponseTimeMonthlyItem[] })),
+        analyticsApi.getResolutionTimeMonthly(token).catch(() => ({ success: false, data: [] as ResolutionTimeMonthlyItem[] })),
       ])
       setTasks(Array.isArray(allTasks) ? allTasks : [])
       setUsers(Array.isArray(allUsers) ? allUsers : [])
       setBacklogData(bklog?.data ?? [])
       setThroughputData(throughput?.data ?? [])
       setResponseTimeData(responseTime?.data ?? [])
+      setResponseTimeMonthlyData(responseTimeMonthly?.data ?? [])
+      setResolutionTimeMonthlyData(resolutionTimeMonthly?.data ?? [])
 
       // normaliza campo de SLA (FastAPI retorna onTimeSolution, não slaPercentage)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -607,13 +616,16 @@ export default function AdminPage() {
             <section aria-label="Resumo geral">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {summaryCards.map(c => (
-                  <div key={c.label} className={`${cardBg} border rounded-xl px-3 py-3 flex items-center gap-2.5 transition-colors`}>
-                    <div className={`w-7 h-7 rounded-lg ${c.bg} border flex items-center justify-center ${c.accent} flex-shrink-0`}>
+                  <div key={c.label}
+                    aria-label={`${c.label}: ${c.value}`}
+                    tabIndex={0}
+                    className={`${cardBg} border rounded-xl px-3 py-3 flex items-center gap-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500`}>
+                    <div className={`w-7 h-7 rounded-lg ${c.bg} border flex items-center justify-center ${c.accent} flex-shrink-0`} aria-hidden="true">
                       {c.icon}
                     </div>
                     <div className="min-w-0">
-                      <p className={`text-[9px] font-semibold ${textFaint} uppercase tracking-widest truncate`}>{c.label}</p>
-                      <p className={`text-xl font-black leading-tight tabular-nums ${typeof c.value === 'string' ? c.accent : text}`}>{c.value}</p>
+                      <p className={`text-[9px] font-semibold ${textFaint} uppercase tracking-widest truncate`} aria-hidden="true">{c.label}</p>
+                      <p className={`text-xl font-black leading-tight tabular-nums ${typeof c.value === 'string' ? c.accent : text}`} aria-hidden="true">{c.value}</p>
                     </div>
                   </div>
                 ))}
@@ -823,6 +835,98 @@ export default function AdminPage() {
                 )}
               </div>
             </section>
+
+            {/* ── SLA Atendimento Inicial / Mês ────────────────────────────── */}
+            {responseTimeMonthlyData.length > 0 && (
+              <section aria-label="SLA de atendimento inicial por mês">
+                <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
+                  <div className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${tableBdr}`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-base leading-none flex-shrink-0">⏱</span>
+                      <div className="min-w-0">
+                        <h2 className={`text-sm font-bold ${text} truncate`}>{t.slaResponseMonthlyTitle}</h2>
+                        <p className={`text-[11px] ${textFaint} mt-0.5`}>{t.slaResponseMonthlyDesc}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 flex-wrap justify-end">
+                      <button onClick={() => setHideResponseTimeMonthlyChart(v => !v)}
+                        className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition flex-shrink-0 ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}>
+                        <span className={`w-2 h-2 rounded-full ${hideResponseTimeMonthlyChart ? 'bg-slate-400' : 'bg-emerald-400'}`} />
+                        {hideResponseTimeMonthlyChart ? t.showLabel : t.hideLabel}
+                      </button>
+                      <span className="flex items-center gap-1">
+                        <svg width="16" height="3"><line x1="0" y1="1.5" x2="16" y2="1.5" stroke="#10b981" strokeWidth="2"/></svg>
+                        <span className={`text-[10px] ${textFaint}`}>{t.slaResponseMonthlyLineName}</span>
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <svg width="16" height="3"><line x1="0" y1="1.5" x2="16" y2="1.5" stroke="#f59e0b" strokeWidth="2" strokeDasharray="4 2"/></svg>
+                        <span className={`text-[10px] ${textFaint}`}>{t.slaResponseMonthlyTarget}</span>
+                      </span>
+                    </div>
+                  </div>
+                  {!hideResponseTimeMonthlyChart && (
+                    <div className="px-4 sm:px-5 py-4">
+                      <ResponsiveContainer width="100%" height={200}>
+                        <LineChart data={responseTimeMonthlyData}>
+                          <CartesianGrid stroke={dark ? 'rgba(255,255,255,.06)' : '#e2e8f0'}/>
+                          <XAxis dataKey="month" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false}/>
+                          <YAxis domain={[0, 100]} unit="%" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false}/>
+                          <Tooltip content={<ChartTooltip dark={dark}/>}/>
+                          <ReferenceLine y={90} stroke="#f59e0b" strokeDasharray="5 3" label={{ value: t.slaResponseMonthlyTarget, fill: '#f59e0b', fontSize: 10, position: 'insideTopRight' }}/>
+                          <Line type="monotone" dataKey="slaPercentage" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', r: 3 }} name={t.slaResponseMonthlyLineName}/>
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {/* ── SLA Tarefas Concluídas no Prazo / Mês ────────────────────── */}
+            {resolutionTimeMonthlyData.length > 0 && (
+              <section aria-label="SLA de resolução por mês">
+                <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
+                  <div className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${tableBdr}`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-base leading-none flex-shrink-0">📋</span>
+                      <div className="min-w-0">
+                        <h2 className={`text-sm font-bold ${text} truncate`}>{t.slaResolutionMonthlyTitle}</h2>
+                        <p className={`text-[11px] ${textFaint} mt-0.5`}>{t.slaResolutionMonthlyDesc}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 flex-wrap justify-end">
+                      <button onClick={() => setHideResolutionTimeMonthlyChart(v => !v)}
+                        className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition flex-shrink-0 ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}>
+                        <span className={`w-2 h-2 rounded-full ${hideResolutionTimeMonthlyChart ? 'bg-slate-400' : 'bg-emerald-400'}`} />
+                        {hideResolutionTimeMonthlyChart ? t.showLabel : t.hideLabel}
+                      </button>
+                      <span className="flex items-center gap-1">
+                        <svg width="16" height="3"><line x1="0" y1="1.5" x2="16" y2="1.5" stroke="#10b981" strokeWidth="2"/></svg>
+                        <span className={`text-[10px] ${textFaint}`}>{t.slaResolutionMonthlyLineName}</span>
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <svg width="16" height="3"><line x1="0" y1="1.5" x2="16" y2="1.5" stroke="#ef4444" strokeWidth="2" strokeDasharray="4 2"/></svg>
+                        <span className={`text-[10px] ${textFaint}`}>{t.slaResolutionMonthlyTarget}</span>
+                      </span>
+                    </div>
+                  </div>
+                  {!hideResolutionTimeMonthlyChart && (
+                    <div className="px-4 sm:px-5 py-4">
+                      <ResponsiveContainer width="100%" height={200}>
+                        <LineChart data={resolutionTimeMonthlyData}>
+                          <CartesianGrid stroke={dark ? 'rgba(255,255,255,.06)' : '#e2e8f0'}/>
+                          <XAxis dataKey="month" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false}/>
+                          <YAxis domain={[0, 100]} unit="%" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false}/>
+                          <Tooltip content={<ChartTooltip dark={dark}/>}/>
+                          <ReferenceLine y={90} stroke="#ef4444" strokeDasharray="5 3" label={{ value: t.slaResolutionMonthlyTarget, fill: '#ef4444', fontSize: 10, position: 'insideTopRight' }}/>
+                          <Line type="monotone" dataKey="slaPercentage" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', r: 3 }} name={t.slaResolutionMonthlyLineName}/>
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
 
             {/* ── Carga por Responsável ────────────────────────────────────── */}
             <section aria-label="Carga por responsável">

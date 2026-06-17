@@ -11,6 +11,7 @@ import { useA11yPrefs } from '@/hooks/useA11yPrefs'
 import type { Priority, Status, FilterTab, AnalyticsResult, TaskDates } from '@/types/dashboard'
 import { mapStatus, mapPriority, today, fmt } from '@/lib/dashboard-utils'
 import { speak } from '@/lib/speak'
+import { useSpeechReader } from '@/hooks/useSpeechReader'
 import { useDashboardTheme } from '@/hooks/useDashboardTheme'
 import { NewTaskModal } from '@/components/dashboard/NewTaskModal'
 import { DeadlineModal } from '@/components/dashboard/DeadlineModal'
@@ -31,6 +32,7 @@ function DashboardPage() {
   const t = translations[locale]
   const { prefs, set: setPrefs }      = useA11yPrefs()
   const dark                          = prefs.darkMode
+  useSpeechReader(prefs.speechMode)
 
   const [isAuthChecked, setIsAuthChecked] = useState(false)
   useEffect(() => {
@@ -108,12 +110,14 @@ function DashboardPage() {
       if (status.data.DONE.count > 0) {
         backlog = await analyticsApi.getBacklog(tok).catch(() => null)
       }
-      const [priority, averageTime, throughput, responseTime, resolutionTime] = await Promise.all([
+      const [priority, averageTime, throughput, responseTime, resolutionTime, responseTimeMonthly, resolutionTimeMonthly] = await Promise.all([
         analyticsApi.getByPriority(tok),
         analyticsApi.getAverageTime(tok),
         analyticsApi.getThroughput(tok),
         analyticsApi.getResponseTime(tok),
         analyticsApi.getResolutionTime(tok).catch(() => null),
+        analyticsApi.getResponseTimeMonthly(tok).catch(() => null),
+        analyticsApi.getResolutionTimeMonthly(tok).catch(() => null),
       ])
       // normalise resolution-time: detecta o campo percentual independente do nome retornado pela FastAPI
       const normalizedResolution = resolutionTime ? {
@@ -145,7 +149,7 @@ function DashboardPage() {
           return { date: item.date ?? '', slaPercentage: slaPercentage ?? 0, target: item.target ?? 90 }
         }),
       } : null
-      setAnalytics({ status, priority, averageTime, throughput, backlog, responseTime, resolutionTime: normalizedResolution })
+      setAnalytics({ status, priority, averageTime, throughput, backlog, responseTime, resolutionTime: normalizedResolution, responseTimeMonthly, resolutionTimeMonthly })
     } catch {
       setAnalytics(null)
     }
@@ -641,11 +645,14 @@ const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? u
               { label: t.statProgress,  value: nProgress, accent: 'text-blue-500',   iconBg: 'bg-blue-500/10 border-blue-500/20',    icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> },
               { label: t.sDonePlural,   value: nDone,     accent: 'text-emerald-500',iconBg: 'bg-emerald-500/10 border-emerald-500/20', icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> },
             ].map(s => (
-              <div key={s.label} className={`${cardBg} border rounded-xl px-4 py-3 flex items-center gap-3 transition-colors`}>
-                <div className={`w-7 h-7 rounded-lg ${s.iconBg} border flex items-center justify-center ${s.accent} flex-shrink-0`}>{s.icon}</div>
+              <div key={s.label}
+                aria-label={`${s.label}: ${s.value}`}
+                tabIndex={0}
+                className={`${cardBg} border rounded-xl px-4 py-3 flex items-center gap-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500`}>
+                <div className={`w-7 h-7 rounded-lg ${s.iconBg} border flex items-center justify-center ${s.accent} flex-shrink-0`} aria-hidden="true">{s.icon}</div>
                 <div>
-                  <p className={`text-[10px] font-semibold ${textFaint} uppercase tracking-widest`}>{s.label}</p>
-                  <p className={`text-xl font-black ${text} leading-tight`}>{s.value}</p>
+                  <p className={`text-[10px] font-semibold ${textFaint} uppercase tracking-widest`} aria-hidden="true">{s.label}</p>
+                  <p className={`text-xl font-black ${text} leading-tight`} aria-hidden="true">{s.value}</p>
                 </div>
               </div>
             ))}
