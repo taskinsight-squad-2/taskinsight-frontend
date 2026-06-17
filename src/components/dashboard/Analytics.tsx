@@ -1,112 +1,197 @@
-'use client'
+"use client";
 
-import React, { useState } from 'react'
+import React, { useState } from "react";
 import {
-  ComposedChart, BarChart, Bar, LineChart, Line,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
-} from 'recharts'
-import type { AnalyticsResult } from '@/types/dashboard'
-import type { DashboardTheme } from '@/hooks/useDashboardTheme'
-import { translations, type Locale } from '@/lib/i18n'
+  ComposedChart,
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+} from "recharts";
+import type { AnalyticsResult } from "@/types/dashboard";
+import type { DashboardTheme } from "@/hooks/useDashboardTheme";
+import { translations, type Locale } from "@/lib/i18n";
 
 interface AnalyticsProps {
-  dark: boolean
-  locale: Locale
-  analytics: AnalyticsResult | null
-  theme: DashboardTheme
+  dark: boolean;
+  locale: Locale;
+  analytics: AnalyticsResult | null;
+  theme: DashboardTheme;
 }
 
-function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
-  const pct = max > 0 ? Math.round((value / max) * 100) : 0
+function MiniBar({
+  value,
+  max,
+  color,
+}: {
+  value: number;
+  max: number;
+  color: string;
+}) {
+  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
   return (
     <div className="flex items-center gap-2 min-w-0">
-      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: color + '22' }}>
-        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: color }} />
+      <div
+        className="flex-1 h-1.5 rounded-full overflow-hidden"
+        style={{ backgroundColor: color + "22" }}
+      >
+        <div
+          className="h-full rounded-full transition-all duration-700"
+          style={{ width: `${pct}%`, backgroundColor: color }}
+        />
       </div>
-      <span className="text-[11px] font-bold tabular-nums w-5 text-right" style={{ color }}>{value}</span>
+      <span
+        className="text-[11px] font-bold tabular-nums w-5 text-right"
+        style={{ color }}
+      >
+        {value}
+      </span>
     </div>
-  )
+  );
 }
 
 export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
-  const { text, textFaint, cardBg } = theme
-  const t = translations[locale]
-  const [hideOverview,             setHideOverview]             = useState(false)
-  const [hideChart,                setHideChart]                = useState(false)
-  const [hideBacklog,              setHideBacklog]              = useState(false)
-  const [hideSla,                  setHideSla]                  = useState(false)
-  const [hideResolution,           setHideResolution]           = useState(false)
-  const [hideResponseMonthly,      setHideResponseMonthly]      = useState(false)
-  const [hideResolutionMonthly,    setHideResolutionMonthly]    = useState(false)
+  const { text, textFaint, cardBg } = theme;
+  const t = translations[locale];
+  const [hideOverview, setHideOverview] = useState(false);
+  const [hideChart, setHideChart] = useState(false);
+  const [hideBacklog, setHideBacklog] = useState(false);
+  const [hideSla, setHideSla] = useState(false);
+  const [hideResolution, setHideResolution] = useState(false);
+  const [hideResponseMonthly, setHideResponseMonthly] = useState(false);
+  const [hideResolutionMonthly, setHideResolutionMonthly] = useState(false);
 
-  const st  = analytics?.status?.data
-  const pr  = analytics?.priority?.data
-  const atd = analytics?.averageTime?.data
-  const hasThroughput              = (analytics?.throughput?.data.length              ?? 0) > 0
-  const hasResponseTime            = (analytics?.responseTime?.data.length            ?? 0) > 0
-  const hasResolutionTime          = (analytics?.resolutionTime?.data.length          ?? 0) > 0
-  const hasBacklog                 = (analytics?.backlog?.data.length                 ?? 0) > 0
-  const hasResponseTimeMonthly     = (analytics?.responseTimeMonthly?.data.length     ?? 0) > 0
-  const hasResolutionTimeMonthly   = (analytics?.resolutionTimeMonthly?.data.length   ?? 0) > 0
+  const st = analytics?.status?.data;
+  const pr = analytics?.priority?.data;
+  const atd = analytics?.averageTime?.data;
+  const hasThroughput = (analytics?.throughput?.data.length ?? 0) > 0;
+  const hasResponseTime = (analytics?.responseTime?.data.length ?? 0) > 0;
+  const hasResolutionTime = (analytics?.resolutionTime?.data.length ?? 0) > 0;
+  const hasBacklog = (analytics?.backlog?.data.length ?? 0) > 0;
+  const hasResponseTimeMonthly =
+    (analytics?.responseTimeMonthly?.data.length ?? 0) > 0;
+  const hasResolutionTimeMonthly =
+    (analytics?.resolutionTimeMonthly?.data.length ?? 0) > 0;
 
-  const stMax = st ? Math.max(st.PENDING.count, st.IN_PROGRESS.count, st.DONE.count, st.CANCELLED?.count ?? 0, 1) : 1
-  const prMax = pr ? Math.max(pr.HIGH.count, pr.MEDIUM.count, pr.LOW.count, 1) : 1
+  const stMax = st
+    ? Math.max(
+        st.PENDING.count,
+        st.IN_PROGRESS.count,
+        st.DONE.count,
+        st.CANCELLED?.count ?? 0,
+        1,
+      )
+    : 1;
+  const prMax = pr
+    ? Math.max(pr.HIGH.count, pr.MEDIUM.count, pr.LOW.count, 1)
+    : 1;
 
-  const border = dark ? 'border-white/8' : 'border-slate-100'
+  const border = dark ? "border-white/8" : "border-slate-100";
 
   const tooltipStyle = {
-    backgroundColor: dark ? '#111827' : '#fff',
-    border: `1px solid ${dark ? 'rgba(255,255,255,0.1)' : '#e2e8f0'}`,
-    borderRadius: 8, fontSize: 11,
-    color: dark ? '#fff' : '#1e293b',
-  }
+    backgroundColor: dark ? "#111827" : "#fff",
+    border: `1px solid ${dark ? "rgba(255,255,255,0.1)" : "#e2e8f0"}`,
+    borderRadius: 8,
+    fontSize: 11,
+    color: dark ? "#fff" : "#1e293b",
+  };
 
   return (
     <div className="flex flex-col gap-3">
-
       {/* ── Overview: status + priority + avg time ── */}
       <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
-        <div className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}>
+        <div
+          className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}
+        >
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-base leading-none flex-shrink-0">📊</span>
             <div className="min-w-0">
-              <p className={`text-sm font-semibold ${text}`}>{t.metricsTitle}</p>
-              <p className={`text-[11px] ${textFaint} mt-0.5`}>{t.metricsDesc}</p>
+              <p className={`text-sm font-semibold ${text}`}>
+                {t.metricsTitle}
+              </p>
+              <p className={`text-[11px] ${textFaint} mt-0.5`}>
+                {t.metricsDesc}
+              </p>
             </div>
           </div>
           <button
-            onClick={() => setHideOverview(v => !v)}
-            className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
+            onClick={() => setHideOverview((v) => !v)}
+            className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition ${dark ? "border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5" : "border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50"}`}
           >
-            <span className={`w-2 h-2 rounded-full ${hideOverview ? 'bg-slate-400' : 'bg-emerald-400'}`} />
+            <span
+              className={`w-2 h-2 rounded-full ${hideOverview ? "bg-slate-400" : "bg-emerald-400"}`}
+            />
             {hideOverview ? t.showDataBtn : t.hideDataBtn}
           </button>
         </div>
 
         {!hideOverview && (
           <div className="px-4 sm:px-5 py-4">
-            {(!st && !pr && !atd) ? (
-              <p className={`text-xs ${textFaint} text-center py-6`}>{t.insufficient}</p>
+            {!st && !pr && !atd ? (
+              <p className={`text-xs ${textFaint} text-center py-6`}>
+                {t.insufficient}
+              </p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-
                 {/* Status */}
                 {st && (
                   <div>
-                    <p className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`} aria-hidden="true">{t.byStatus}</p>
+                    <p
+                      className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`}
+                      aria-hidden="true"
+                    >
+                      {t.byStatus}
+                    </p>
                     <div className="flex flex-col gap-2.5">
                       {[
-                        { label: t.statusPending, value: st.PENDING.count,     color: dark ? '#94a3b8' : '#64748b' },
-                        { label: t.sInProgress,   value: st.IN_PROGRESS.count, color: '#3b82f6' },
-                        { label: t.statusDone,    value: st.DONE.count,        color: '#10b981' },
-                        ...(st.CANCELLED ? [{ label: t.sCancelled, value: st.CANCELLED.count, color: '#f43f5e' }] : []),
-                      ].map(r => (
-                        <div key={r.label}
-                          aria-label={`${r.label}: ${r.value} ${locale === 'pt' ? 'tarefas' : 'tasks'}`}
+                        {
+                          label: t.statusPending,
+                          value: st.PENDING.count,
+                          color: dark ? "#94a3b8" : "#64748b",
+                        },
+                        {
+                          label: t.sInProgress,
+                          value: st.IN_PROGRESS.count,
+                          color: "#3b82f6",
+                        },
+                        {
+                          label: t.statusDone,
+                          value: st.DONE.count,
+                          color: "#10b981",
+                        },
+                        ...(st.CANCELLED
+                          ? [
+                              {
+                                label: t.sCancelled,
+                                value: st.CANCELLED.count,
+                                color: "#f43f5e",
+                              },
+                            ]
+                          : []),
+                      ].map((r) => (
+                        <div
+                          key={r.label}
+                          aria-label={`${r.label}: ${r.value} ${locale === "pt" ? "tarefas" : "tasks"}`}
                           tabIndex={0}
-                          className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-500 rounded">
-                          <span className={`text-[11px] ${textFaint} block mb-0.5`} aria-hidden="true">{r.label}</span>
-                          <MiniBar value={r.value} max={stMax} color={r.color} />
+                          className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-500 rounded"
+                        >
+                          <span
+                            className={`text-[11px] ${textFaint} block mb-0.5`}
+                            aria-hidden="true"
+                          >
+                            {r.label}
+                          </span>
+                          <MiniBar
+                            value={r.value}
+                            max={stMax}
+                            color={r.color}
+                          />
                         </div>
                       ))}
                     </div>
@@ -116,19 +201,47 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
                 {/* Priority */}
                 {pr && (
                   <div>
-                    <p className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`} aria-hidden="true">{t.byPriority}</p>
+                    <p
+                      className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`}
+                      aria-hidden="true"
+                    >
+                      {t.byPriority}
+                    </p>
                     <div className="flex flex-col gap-2.5">
                       {[
-                        { label: t.priorityHigh,   value: pr.HIGH.count,   color: '#ef4444' },
-                        { label: t.priorityMedium, value: pr.MEDIUM.count, color: '#f59e0b' },
-                        { label: t.priorityLow,    value: pr.LOW.count,    color: '#10b981' },
-                      ].map(r => (
-                        <div key={r.label}
-                          aria-label={`${r.label}: ${r.value} ${locale === 'pt' ? 'tarefas' : 'tasks'}`}
+                        {
+                          label: t.priorityHigh,
+                          value: pr.HIGH.count,
+                          color: "#ef4444",
+                        },
+                        {
+                          label: t.priorityMedium,
+                          value: pr.MEDIUM.count,
+                          color: "#f59e0b",
+                        },
+                        {
+                          label: t.priorityLow,
+                          value: pr.LOW.count,
+                          color: "#10b981",
+                        },
+                      ].map((r) => (
+                        <div
+                          key={r.label}
+                          aria-label={`${r.label}: ${r.value} ${locale === "pt" ? "tarefas" : "tasks"}`}
                           tabIndex={0}
-                          className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-500 rounded">
-                          <span className={`text-[11px] ${textFaint} block mb-0.5`} aria-hidden="true">{r.label}</span>
-                          <MiniBar value={r.value} max={prMax} color={r.color} />
+                          className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-500 rounded"
+                        >
+                          <span
+                            className={`text-[11px] ${textFaint} block mb-0.5`}
+                            aria-hidden="true"
+                          >
+                            {r.label}
+                          </span>
+                          <MiniBar
+                            value={r.value}
+                            max={prMax}
+                            color={r.color}
+                          />
                         </div>
                       ))}
                     </div>
@@ -138,26 +251,51 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
                 {/* Avg time */}
                 {atd && (
                   <div
-                    aria-label={`${t.avgCompletionLbl}: ${atd.average_time_hours.toFixed(1)} ${locale === 'pt' ? 'horas' : 'hours'}, ${atd.average_time_days.toFixed(2)} ${t.daysLabel.toLowerCase()}, ${Math.round(atd.average_time_hours * 60)} ${locale === 'pt' ? 'minutos' : 'minutes'}`}
+                    aria-label={`${t.avgCompletionLbl}: ${atd.average_time_hours.toFixed(1)} ${locale === "pt" ? "horas" : "hours"}, ${atd.average_time_days.toFixed(2)} ${t.daysLabel.toLowerCase()}, ${Math.round(atd.average_time_hours * 60)} ${locale === "pt" ? "minutos" : "minutes"}`}
                     tabIndex={0}
-                    className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-500 rounded">
-                    <p className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`} aria-hidden="true">{t.avgCompletionLbl}</p>
-                    <p className={`text-3xl font-black ${text} tabular-nums leading-none mb-3`} aria-hidden="true">
-                      {atd.average_time_hours.toFixed(1)}<span className={`text-lg font-semibold ${textFaint} ml-0.5`}>h</span>
+                    className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-500 rounded"
+                  >
+                    <p
+                      className={`text-[10px] font-bold uppercase tracking-widest ${textFaint} mb-3`}
+                      aria-hidden="true"
+                    >
+                      {t.avgCompletionLbl}
+                    </p>
+                    <p
+                      className={`text-3xl font-black ${text} tabular-nums leading-none mb-3`}
+                      aria-hidden="true"
+                    >
+                      {atd.average_time_hours.toFixed(1)}
+                      <span
+                        className={`text-lg font-semibold ${textFaint} ml-0.5`}
+                      >
+                        h
+                      </span>
                     </p>
                     <div className="flex flex-col gap-1.5" aria-hidden="true">
                       <div className="flex items-baseline gap-1.5">
-                        <span className={`text-base font-bold ${text} tabular-nums`}>{atd.average_time_days.toFixed(2)}</span>
-                        <span className={`text-[11px] ${textFaint}`}>{t.daysLabel.toLowerCase()}</span>
+                        <span
+                          className={`text-base font-bold ${text} tabular-nums`}
+                        >
+                          {atd.average_time_days.toFixed(2)}
+                        </span>
+                        <span className={`text-[11px] ${textFaint}`}>
+                          {t.daysLabel.toLowerCase()}
+                        </span>
                       </div>
                       <div className="flex items-baseline gap-1.5">
-                        <span className={`text-base font-bold ${text} tabular-nums`}>{Math.round(atd.average_time_hours * 60)}</span>
-                        <span className={`text-[11px] ${textFaint}`}>{locale === 'pt' ? 'minutos' : 'minutes'}</span>
+                        <span
+                          className={`text-base font-bold ${text} tabular-nums`}
+                        >
+                          {Math.round(atd.average_time_hours * 60)}
+                        </span>
+                        <span className={`text-[11px] ${textFaint}`}>
+                          {locale === "pt" ? "minutos" : "minutes"}
+                        </span>
                       </div>
                     </div>
                   </div>
                 )}
-
               </div>
             )}
           </div>
@@ -167,25 +305,44 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
       {/* ── Throughput / Produtividade Diária ── */}
       {hasThroughput && (
         <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
-          <div className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}>
+          <div
+            className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}
+          >
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-base leading-none flex-shrink-0">📈</span>
               <div className="min-w-0">
-                <p className={`text-sm font-semibold ${text}`}>{t.dailyProductivity}</p>
-                <p className={`text-[11px] ${textFaint} mt-0.5`}>{t.dailyProductivityDesc}</p>
+                <p className={`text-sm font-semibold ${text}`}>
+                  {t.dailyProductivity}
+                </p>
+                <p className={`text-[11px] ${textFaint} mt-0.5`}>
+                  {t.dailyProductivityDesc}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-3 flex-wrap justify-end">
               <button
-                onClick={() => setHideChart(v => !v)}
-                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition flex-shrink-0 ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
+                onClick={() => setHideChart((v) => !v)}
+                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition flex-shrink-0 ${dark ? "border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5" : "border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50"}`}
               >
-                <span className={`w-2 h-2 rounded-full ${hideChart ? 'bg-slate-400' : 'bg-emerald-400'}`} />
+                <span
+                  className={`w-2 h-2 rounded-full ${hideChart ? "bg-slate-400" : "bg-emerald-400"}`}
+                />
                 {hideChart ? t.showLabel : t.hideLabel}
               </button>
               <span className="flex items-center gap-1">
-                <svg width="16" height="3"><line x1="0" y1="1.5" x2="16" y2="1.5" stroke="#7c3aed" strokeWidth="2"/></svg>
-                <span className={`text-[10px] ${textFaint}`}>{t.sDonePlural}</span>
+                <svg width="16" height="3">
+                  <line
+                    x1="0"
+                    y1="1.5"
+                    x2="16"
+                    y2="1.5"
+                    stroke="#7c3aed"
+                    strokeWidth="2"
+                  />
+                </svg>
+                <span className={`text-[10px] ${textFaint}`}>
+                  {t.sDonePlural}
+                </span>
               </span>
             </div>
           </div>
@@ -194,11 +351,35 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
             <div className="px-4 sm:px-5 py-4">
               <ResponsiveContainer width="100%" height={180}>
                 <LineChart data={analytics.throughput.data}>
-                  <CartesianGrid stroke={dark ? 'rgba(255,255,255,.06)' : '#e2e8f0'} />
-                  <XAxis dataKey="day" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <CartesianGrid
+                    stroke={dark ? "rgba(255,255,255,.06)" : "#e2e8f0"}
+                  />
+                  <XAxis
+                    dataKey="day"
+                    tick={{
+                      fill: dark ? "#ffffff40" : "#94a3b8",
+                      fontSize: 10,
+                    }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{
+                      fill: dark ? "#ffffff40" : "#94a3b8",
+                      fontSize: 10,
+                    }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
                   <Tooltip contentStyle={tooltipStyle} />
-                  <Line type="monotone" dataKey="count" stroke="#7c3aed" strokeWidth={2} dot={{ fill: '#7c3aed', r: 3 }} name={t.sDonePlural} />
+                  <Line
+                    type="monotone"
+                    dataKey="count"
+                    stroke="#7c3aed"
+                    strokeWidth={2}
+                    dot={{ fill: "#7c3aed", r: 3 }}
+                    name={t.sDonePlural}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -209,31 +390,56 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
       {/* ── Backlog (criadas × finalizadas) ── */}
       {hasBacklog && (
         <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
-          <div className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}>
+          <div
+            className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}
+          >
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-base leading-none flex-shrink-0">📊</span>
               <div className="min-w-0">
-                <p className={`text-sm font-semibold ${text}`}>{t.backlogChartTitle}</p>
-                <p className={`text-[11px] ${textFaint} mt-0.5`}>{t.backlogChartDesc}</p>
+                <p className={`text-sm font-semibold ${text}`}>
+                  {t.backlogChartTitle}
+                </p>
+                <p className={`text-[11px] ${textFaint} mt-0.5`}>
+                  {t.backlogChartDesc}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-3 flex-wrap justify-end">
-              <button onClick={() => setHideBacklog(v => !v)}
-                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition flex-shrink-0 ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}>
-                <span className={`w-2 h-2 rounded-full ${hideBacklog ? 'bg-slate-400' : 'bg-emerald-400'}`} />
+              <button
+                onClick={() => setHideBacklog((v) => !v)}
+                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition flex-shrink-0 ${dark ? "border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5" : "border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50"}`}
+              >
+                <span
+                  className={`w-2 h-2 rounded-full ${hideBacklog ? "bg-slate-400" : "bg-emerald-400"}`}
+                />
                 {hideBacklog ? t.showLabel : t.hideLabel}
               </button>
               <div className="flex gap-3">
-                {([
-                  { c: '#7c3aed', l: 'Criadas', bar: true },
-                  { c: '#10b981', l: 'Finalizadas', bar: true },
-                  { c: '#f97316', l: 'Backlog', bar: false },
-                ] as { c: string; l: string; bar: boolean }[]).map(({ c, l, bar }) => (
+                {(
+                  [
+                    { c: "#7c3aed", l: "Criadas", bar: true },
+                    { c: "#10b981", l: "Finalizadas", bar: true },
+                    { c: "#f97316", l: "Backlog", bar: false },
+                  ] as { c: string; l: string; bar: boolean }[]
+                ).map(({ c, l, bar }) => (
                   <span key={l} className="flex items-center gap-1">
-                    {bar
-                      ? <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: c }}/>
-                      : <svg width="16" height="3"><line x1="0" y1="1.5" x2="16" y2="1.5" stroke={c} strokeWidth="2"/></svg>
-                    }
+                    {bar ? (
+                      <span
+                        className="w-2 h-2 rounded-sm flex-shrink-0"
+                        style={{ backgroundColor: c }}
+                      />
+                    ) : (
+                      <svg width="16" height="3">
+                        <line
+                          x1="0"
+                          y1="1.5"
+                          x2="16"
+                          y2="1.5"
+                          stroke={c}
+                          strokeWidth="2"
+                        />
+                      </svg>
+                    )}
                     <span className={`text-[10px] ${textFaint}`}>{l}</span>
                   </span>
                 ))}
@@ -244,19 +450,55 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
             <div className="px-4 sm:px-5 py-4">
               <ResponsiveContainer width="100%" height={200}>
                 <ComposedChart data={analytics!.backlog!.data}>
-                  <CartesianGrid stroke={dark ? 'rgba(255,255,255,.06)' : '#e2e8f0'} vertical={false}/>
-                  <XAxis dataKey="date"
-                    tickFormatter={(v: string) => v?.slice(5)?.replace('-', '/')}
-                    tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }}
-                    axisLine={false} tickLine={false}/>
-                  <YAxis allowDecimals={false}
-                    tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }}
-                    axisLine={false} tickLine={false}/>
-                  <Tooltip contentStyle={tooltipStyle}/>
-                  <Bar dataKey="criadas"     name="Criadas"     fill="#7c3aed" radius={[3,3,0,0]} barSize={8}/>
-                  <Bar dataKey="finalizadas" name="Finalizadas" fill="#10b981" radius={[3,3,0,0]} barSize={8}/>
-                  <Line type="monotone" dataKey="backlog" name="Backlog"
-                    stroke="#f97316" strokeWidth={2} dot={false} activeDot={{ r: 4 }}/>
+                  <CartesianGrid
+                    stroke={dark ? "rgba(255,255,255,.06)" : "#e2e8f0"}
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={(v: string) =>
+                      v?.slice(5)?.replace("-", "/")
+                    }
+                    tick={{
+                      fill: dark ? "#ffffff40" : "#94a3b8",
+                      fontSize: 10,
+                    }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{
+                      fill: dark ? "#ffffff40" : "#94a3b8",
+                      fontSize: 10,
+                    }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Bar
+                    dataKey="criadas"
+                    name="Criadas"
+                    fill="#7c3aed"
+                    radius={[3, 3, 0, 0]}
+                    barSize={8}
+                  />
+                  <Bar
+                    dataKey="finalizadas"
+                    name="Finalizadas"
+                    fill="#10b981"
+                    radius={[3, 3, 0, 0]}
+                    barSize={8}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="backlog"
+                    name="Backlog"
+                    stroke="#f97316"
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 4 }}
+                  />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -267,28 +509,55 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
       {/* ── SLA Atendimento Inicial (response-time) ── */}
       {hasResponseTime && (
         <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
-          <div className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}>
+          <div
+            className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}
+          >
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-base leading-none flex-shrink-0">⏱</span>
               <div className="min-w-0">
-                <p className={`text-sm font-semibold ${text} truncate`}>{t.slaResponseTitle}</p>
-                <p className={`text-[11px] ${textFaint} mt-0.5`}>{t.slaResponseDesc}</p>
+                <p className={`text-sm font-semibold ${text} truncate`}>
+                  {t.slaResponseTitle}
+                </p>
+                <p className={`text-[11px] ${textFaint} mt-0.5`}>
+                  {t.slaResponseDesc}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-3 flex-wrap justify-end">
               <button
-                onClick={() => setHideSla(v => !v)}
-                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition flex-shrink-0 ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
+                onClick={() => setHideSla((v) => !v)}
+                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition flex-shrink-0 ${dark ? "border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5" : "border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50"}`}
               >
-                <span className={`w-2 h-2 rounded-full ${hideSla ? 'bg-slate-400' : 'bg-emerald-400'}`} />
+                <span
+                  className={`w-2 h-2 rounded-full ${hideSla ? "bg-slate-400" : "bg-emerald-400"}`}
+                />
                 {hideSla ? t.showLabel : t.hideLabel}
               </button>
               <span className="flex items-center gap-1">
-                <svg width="16" height="3"><line x1="0" y1="1.5" x2="16" y2="1.5" stroke="#10b981" strokeWidth="2"/></svg>
+                <svg width="16" height="3">
+                  <line
+                    x1="0"
+                    y1="1.5"
+                    x2="16"
+                    y2="1.5"
+                    stroke="#10b981"
+                    strokeWidth="2"
+                  />
+                </svg>
                 <span className={`text-[10px] ${textFaint}`}>SLA %</span>
               </span>
               <span className="flex items-center gap-1">
-                <svg width="16" height="3"><line x1="0" y1="1.5" x2="16" y2="1.5" stroke="#f59e0b" strokeWidth="2" strokeDasharray="4 2"/></svg>
+                <svg width="16" height="3">
+                  <line
+                    x1="0"
+                    y1="1.5"
+                    x2="16"
+                    y2="1.5"
+                    stroke="#f59e0b"
+                    strokeWidth="2"
+                    strokeDasharray="4 2"
+                  />
+                </svg>
                 <span className={`text-[10px] ${textFaint}`}>Meta 90%</span>
               </span>
             </div>
@@ -298,12 +567,53 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
             <div className="px-4 sm:px-5 py-4">
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={analytics.responseTime.data}>
-                  <CartesianGrid stroke={dark ? 'rgba(255,255,255,.06)' : '#e2e8f0'} />
-                  <XAxis dataKey="date" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis domain={[0, 100]} unit="%" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => typeof v === 'number' ? `${v.toFixed(1)}%` : v} />
-                  <ReferenceLine y={90} stroke="#f59e0b" strokeDasharray="5 3" label={{ value: t.slaResponseTarget, fill: '#f59e0b', fontSize: 10, position: 'insideTopRight' }} />
-                  <Line type="monotone" dataKey="slaPercentage" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', r: 3 }} name={t.slaResponseLineName} />
+                  <CartesianGrid
+                    stroke={dark ? "rgba(255,255,255,.06)" : "#e2e8f0"}
+                  />
+                  <XAxis
+                    dataKey="date"
+                    tick={{
+                      fill: dark ? "#ffffff40" : "#94a3b8",
+                      fontSize: 10,
+                    }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    domain={[0, 100]}
+                    unit="%"
+                    tick={{
+                      fill: dark ? "#ffffff40" : "#94a3b8",
+                      fontSize: 10,
+                    }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    formatter={(v) =>
+                      typeof v === "number" ? `${v.toFixed(1)}%` : v
+                    }
+                  />
+                  <ReferenceLine
+                    y={90}
+                    stroke="#f59e0b"
+                    strokeDasharray="5 3"
+                    label={{
+                      value: t.slaResponseTarget,
+                      fill: "#f59e0b",
+                      fontSize: 10,
+                      position: "insideTopRight",
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="slaPercentage"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    dot={{ fill: "#10b981", r: 3 }}
+                    name={t.slaResponseLineName}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -314,28 +624,55 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
       {/* ── SLA Tarefas Concluídas no Prazo (resolution-time) ── */}
       {hasResolutionTime && analytics?.resolutionTime && (
         <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
-          <div className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}>
+          <div
+            className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}
+          >
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-base leading-none flex-shrink-0">📋</span>
               <div className="min-w-0">
-                <p className={`text-sm font-semibold ${text} truncate`}>{t.slaResolutionTitle}</p>
-                <p className={`text-[11px] ${textFaint} mt-0.5`}>{t.slaResolutionDesc}</p>
+                <p className={`text-sm font-semibold ${text} truncate`}>
+                  {t.slaResolutionTitle}
+                </p>
+                <p className={`text-[11px] ${textFaint} mt-0.5`}>
+                  {t.slaResolutionDesc}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-3 flex-wrap justify-end">
               <button
-                onClick={() => setHideResolution(v => !v)}
-                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition flex-shrink-0 ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
+                onClick={() => setHideResolution((v) => !v)}
+                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition flex-shrink-0 ${dark ? "border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5" : "border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50"}`}
               >
-                <span className={`w-2 h-2 rounded-full ${hideResolution ? 'bg-slate-400' : 'bg-emerald-400'}`} />
+                <span
+                  className={`w-2 h-2 rounded-full ${hideResolution ? "bg-slate-400" : "bg-emerald-400"}`}
+                />
                 {hideResolution ? t.showLabel : t.hideLabel}
               </button>
               <span className="flex items-center gap-1">
-                <svg width="16" height="3"><line x1="0" y1="1.5" x2="16" y2="1.5" stroke="#10b981" strokeWidth="2"/></svg>
+                <svg width="16" height="3">
+                  <line
+                    x1="0"
+                    y1="1.5"
+                    x2="16"
+                    y2="1.5"
+                    stroke="#10b981"
+                    strokeWidth="2"
+                  />
+                </svg>
                 <span className={`text-[10px] ${textFaint}`}>SLA %</span>
               </span>
               <span className="flex items-center gap-1">
-                <svg width="16" height="3"><line x1="0" y1="1.5" x2="16" y2="1.5" stroke="#ef4444" strokeWidth="2" strokeDasharray="4 2"/></svg>
+                <svg width="16" height="3">
+                  <line
+                    x1="0"
+                    y1="1.5"
+                    x2="16"
+                    y2="1.5"
+                    stroke="#ef4444"
+                    strokeWidth="2"
+                    strokeDasharray="4 2"
+                  />
+                </svg>
                 <span className={`text-[10px] ${textFaint}`}>Meta 90%</span>
               </span>
             </div>
@@ -345,19 +682,62 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
             <div className="px-4 sm:px-5 py-4">
               {analytics.resolutionTime.data.length === 0 ? (
                 <p className={`text-xs ${textFaint} text-center py-6`}>
-                  {locale === 'pt' ? 'Nenhuma tarefa concluída no prazo registrada ainda.' : 'No tasks completed on time recorded yet.'}
+                  {locale === "pt"
+                    ? "Nenhuma tarefa concluída no prazo registrada ainda."
+                    : "No tasks completed on time recorded yet."}
                 </p>
               ) : (
-              <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={analytics.resolutionTime.data}>
-                  <CartesianGrid stroke={dark ? 'rgba(255,255,255,.06)' : '#e2e8f0'} />
-                  <XAxis dataKey="date" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis domain={[0, 100]} unit="%" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => typeof v === 'number' ? `${v.toFixed(1)}%` : v} />
-                  <ReferenceLine y={90} stroke="#ef4444" strokeDasharray="5 3" label={{ value: t.slaResolutionTarget, fill: '#ef4444', fontSize: 10, position: 'insideTopRight' }} />
-                  <Line type="monotone" dataKey="slaPercentage" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', r: 3 }} name={t.slaResolutionLineName} />
-                </LineChart>
-              </ResponsiveContainer>
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={analytics.resolutionTime.data}>
+                    <CartesianGrid
+                      stroke={dark ? "rgba(255,255,255,.06)" : "#e2e8f0"}
+                    />
+                    <XAxis
+                      dataKey="date"
+                      tick={{
+                        fill: dark ? "#ffffff40" : "#94a3b8",
+                        fontSize: 10,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      domain={[0, 100]}
+                      unit="%"
+                      tick={{
+                        fill: dark ? "#ffffff40" : "#94a3b8",
+                        fontSize: 10,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={tooltipStyle}
+                      formatter={(v) =>
+                        typeof v === "number" ? `${v.toFixed(1)}%` : v
+                      }
+                    />
+                    <ReferenceLine
+                      y={90}
+                      stroke="#ef4444"
+                      strokeDasharray="5 3"
+                      label={{
+                        value: t.slaResolutionTarget,
+                        fill: "#ef4444",
+                        fontSize: 10,
+                        position: "insideTopRight",
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="slaPercentage"
+                      stroke="#10b981"
+                      strokeWidth={2}
+                      dot={{ fill: "#10b981", r: 3 }}
+                      name={t.slaResolutionLineName}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               )}
             </div>
           )}
@@ -367,29 +747,60 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
       {/* ── SLA Atendimento Inicial / Mês (response-time monthly) ── */}
       {hasResponseTimeMonthly && (
         <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
-          <div className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}>
+          <div
+            className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}
+          >
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-base leading-none flex-shrink-0">⏱</span>
               <div className="min-w-0">
-                <p className={`text-sm font-semibold ${text} truncate`}>{t.slaResponseMonthlyTitle}</p>
-                <p className={`text-[11px] ${textFaint} mt-0.5`}>{t.slaResponseMonthlyDesc}</p>
+                <p className={`text-sm font-semibold ${text} truncate`}>
+                  {t.slaResponseMonthlyTitle}
+                </p>
+                <p className={`text-[11px] ${textFaint} mt-0.5`}>
+                  {t.slaResponseMonthlyDesc}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-3 flex-wrap justify-end">
               <button
-                onClick={() => setHideResponseMonthly(v => !v)}
-                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition flex-shrink-0 ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
+                onClick={() => setHideResponseMonthly((v) => !v)}
+                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition flex-shrink-0 ${dark ? "border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5" : "border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50"}`}
               >
-                <span className={`w-2 h-2 rounded-full ${hideResponseMonthly ? 'bg-slate-400' : 'bg-emerald-400'}`} />
+                <span
+                  className={`w-2 h-2 rounded-full ${hideResponseMonthly ? "bg-slate-400" : "bg-emerald-400"}`}
+                />
                 {hideResponseMonthly ? t.showLabel : t.hideLabel}
               </button>
               <span className="flex items-center gap-1">
-                <svg width="16" height="3"><line x1="0" y1="1.5" x2="16" y2="1.5" stroke="#10b981" strokeWidth="2"/></svg>
-                <span className={`text-[10px] ${textFaint}`}>{t.slaResponseMonthlyLineName}</span>
+                <svg width="16" height="3">
+                  <line
+                    x1="0"
+                    y1="1.5"
+                    x2="16"
+                    y2="1.5"
+                    stroke="#10b981"
+                    strokeWidth="2"
+                  />
+                </svg>
+                <span className={`text-[10px] ${textFaint}`}>
+                  {t.slaResponseMonthlyLineName}
+                </span>
               </span>
               <span className="flex items-center gap-1">
-                <svg width="16" height="3"><line x1="0" y1="1.5" x2="16" y2="1.5" stroke="#f59e0b" strokeWidth="2" strokeDasharray="4 2"/></svg>
-                <span className={`text-[10px] ${textFaint}`}>{t.slaResponseMonthlyTarget}</span>
+                <svg width="16" height="3">
+                  <line
+                    x1="0"
+                    y1="1.5"
+                    x2="16"
+                    y2="1.5"
+                    stroke="#f59e0b"
+                    strokeWidth="2"
+                    strokeDasharray="4 2"
+                  />
+                </svg>
+                <span className={`text-[10px] ${textFaint}`}>
+                  {t.slaResponseMonthlyTarget}
+                </span>
               </span>
             </div>
           </div>
@@ -398,12 +809,53 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
             <div className="px-4 sm:px-5 py-4">
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={analytics.responseTimeMonthly.data}>
-                  <CartesianGrid stroke={dark ? 'rgba(255,255,255,.06)' : '#e2e8f0'} />
-                  <XAxis dataKey="month" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis domain={[0, 100]} unit="%" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => typeof v === 'number' ? `${v.toFixed(1)}%` : v} />
-                  <ReferenceLine y={90} stroke="#f59e0b" strokeDasharray="5 3" label={{ value: t.slaResponseMonthlyTarget, fill: '#f59e0b', fontSize: 10, position: 'insideTopRight' }} />
-                  <Line type="monotone" dataKey="slaPercentage" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', r: 3 }} name={t.slaResponseMonthlyLineName} />
+                  <CartesianGrid
+                    stroke={dark ? "rgba(255,255,255,.06)" : "#e2e8f0"}
+                  />
+                  <XAxis
+                    dataKey="month"
+                    tick={{
+                      fill: dark ? "#ffffff40" : "#94a3b8",
+                      fontSize: 10,
+                    }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    domain={[0, 100]}
+                    unit="%"
+                    tick={{
+                      fill: dark ? "#ffffff40" : "#94a3b8",
+                      fontSize: 10,
+                    }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    formatter={(v) =>
+                      typeof v === "number" ? `${v.toFixed(1)}%` : v
+                    }
+                  />
+                  <ReferenceLine
+                    y={90}
+                    stroke="#f59e0b"
+                    strokeDasharray="5 3"
+                    label={{
+                      value: t.slaResponseMonthlyTarget,
+                      fill: "#f59e0b",
+                      fontSize: 10,
+                      position: "insideTopRight",
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="slaPercentage"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    dot={{ fill: "#10b981", r: 3 }}
+                    name={t.slaResponseMonthlyLineName}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -414,29 +866,60 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
       {/* ── SLA Tarefas Concluídas no Prazo / Mês (resolution-time monthly) ── */}
       {hasResolutionTimeMonthly && (
         <div className={`${cardBg} border rounded-2xl overflow-hidden`}>
-          <div className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}>
+          <div
+            className={`flex items-center justify-between px-5 pt-4 pb-3 border-b ${border}`}
+          >
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-base leading-none flex-shrink-0">📋</span>
               <div className="min-w-0">
-                <p className={`text-sm font-semibold ${text} truncate`}>{t.slaResolutionMonthlyTitle}</p>
-                <p className={`text-[11px] ${textFaint} mt-0.5`}>{t.slaResolutionMonthlyDesc}</p>
+                <p className={`text-sm font-semibold ${text} truncate`}>
+                  {t.slaResolutionMonthlyTitle}
+                </p>
+                <p className={`text-[11px] ${textFaint} mt-0.5`}>
+                  {t.slaResolutionMonthlyDesc}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-3 flex-wrap justify-end">
               <button
-                onClick={() => setHideResolutionMonthly(v => !v)}
-                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition flex-shrink-0 ${dark ? 'border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
+                onClick={() => setHideResolutionMonthly((v) => !v)}
+                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition flex-shrink-0 ${dark ? "border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5" : "border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50"}`}
               >
-                <span className={`w-2 h-2 rounded-full ${hideResolutionMonthly ? 'bg-slate-400' : 'bg-emerald-400'}`} />
+                <span
+                  className={`w-2 h-2 rounded-full ${hideResolutionMonthly ? "bg-slate-400" : "bg-emerald-400"}`}
+                />
                 {hideResolutionMonthly ? t.showLabel : t.hideLabel}
               </button>
               <span className="flex items-center gap-1">
-                <svg width="16" height="3"><line x1="0" y1="1.5" x2="16" y2="1.5" stroke="#10b981" strokeWidth="2"/></svg>
-                <span className={`text-[10px] ${textFaint}`}>{t.slaResolutionMonthlyLineName}</span>
+                <svg width="16" height="3">
+                  <line
+                    x1="0"
+                    y1="1.5"
+                    x2="16"
+                    y2="1.5"
+                    stroke="#10b981"
+                    strokeWidth="2"
+                  />
+                </svg>
+                <span className={`text-[10px] ${textFaint}`}>
+                  {t.slaResolutionMonthlyLineName}
+                </span>
               </span>
               <span className="flex items-center gap-1">
-                <svg width="16" height="3"><line x1="0" y1="1.5" x2="16" y2="1.5" stroke="#ef4444" strokeWidth="2" strokeDasharray="4 2"/></svg>
-                <span className={`text-[10px] ${textFaint}`}>{t.slaResolutionMonthlyTarget}</span>
+                <svg width="16" height="3">
+                  <line
+                    x1="0"
+                    y1="1.5"
+                    x2="16"
+                    y2="1.5"
+                    stroke="#ef4444"
+                    strokeWidth="2"
+                    strokeDasharray="4 2"
+                  />
+                </svg>
+                <span className={`text-[10px] ${textFaint}`}>
+                  {t.slaResolutionMonthlyTarget}
+                </span>
               </span>
             </div>
           </div>
@@ -445,19 +928,59 @@ export function Analytics({ dark, locale, analytics, theme }: AnalyticsProps) {
             <div className="px-4 sm:px-5 py-4">
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={analytics.resolutionTimeMonthly.data}>
-                  <CartesianGrid stroke={dark ? 'rgba(255,255,255,.06)' : '#e2e8f0'} />
-                  <XAxis dataKey="month" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis domain={[0, 100]} unit="%" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => typeof v === 'number' ? `${v.toFixed(1)}%` : v} />
-                  <ReferenceLine y={90} stroke="#ef4444" strokeDasharray="5 3" label={{ value: t.slaResolutionMonthlyTarget, fill: '#ef4444', fontSize: 10, position: 'insideTopRight' }} />
-                  <Line type="monotone" dataKey="slaPercentage" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', r: 3 }} name={t.slaResolutionMonthlyLineName} />
+                  <CartesianGrid
+                    stroke={dark ? "rgba(255,255,255,.06)" : "#e2e8f0"}
+                  />
+                  <XAxis
+                    dataKey="month"
+                    tick={{
+                      fill: dark ? "#ffffff40" : "#94a3b8",
+                      fontSize: 10,
+                    }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    domain={[0, 100]}
+                    unit="%"
+                    tick={{
+                      fill: dark ? "#ffffff40" : "#94a3b8",
+                      fontSize: 10,
+                    }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    formatter={(v) =>
+                      typeof v === "number" ? `${v.toFixed(1)}%` : v
+                    }
+                  />
+                  <ReferenceLine
+                    y={90}
+                    stroke="#ef4444"
+                    strokeDasharray="5 3"
+                    label={{
+                      value: t.slaResolutionMonthlyTarget,
+                      fill: "#ef4444",
+                      fontSize: 10,
+                      position: "insideTopRight",
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="onTimeSolution"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    dot={{ fill: "#10b981", r: 3 }}
+                    name={t.slaResolutionMonthlyLineName}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           )}
         </div>
       )}
-
     </div>
-  )
+  );
 }
