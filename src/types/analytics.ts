@@ -88,13 +88,24 @@ export interface ResolutionTimeResponse {
   data: ResolutionTimeItem[];
 }
 
-export interface ResolutionTimeMesItem {
+export interface ResponseTimeMonthlyItem {
   month: string;
-  onTimeSolution: number;
+  slaPercentage: number;
   target: number;
 }
 
-export interface ResolutionTimeMesResponse {
+export interface ResponseTimeMonthlyResponse {
   success: boolean;
-  data: ResolutionTimeMesItem[];
+  data: ResponseTimeMonthlyItem[];
+}
+
+export interface ResolutionTimeMonthlyItem {
+  month: string;
+  slaPercentage: number;
+  target: number;
+}
+
+export interface ResolutionTimeMonthlyResponse {
+  success: boolean;
+  data: ResolutionTimeMonthlyItem[];
 }
