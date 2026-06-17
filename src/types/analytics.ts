@@ -80,7 +80,7 @@ export interface ResolutionTimeResponse {
 export interface ResponseTimeMonthlyItem {
   month: string;
   slaPercentage: number;
-  target: number;
+  target: 90;
 }
 
 export interface ResponseTimeMonthlyResponse {
@@ -90,7 +90,7 @@ export interface ResponseTimeMonthlyResponse {
 
 export interface ResolutionTimeMonthlyItem {
   month: string;
-  slaPercentage: number;
+  onTimeSolution: number;
   target: number;
 }
 
