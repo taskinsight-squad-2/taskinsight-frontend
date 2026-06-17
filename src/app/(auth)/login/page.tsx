@@ -6,6 +6,7 @@ import { translations, type Locale } from "@/lib/i18n";
 import { authService } from "@/services/auth.service";
 import { useA11yPrefs } from "@/hooks/useA11yPrefs";
 import { speak } from "@/lib/speak";
+import { useSpeechReader } from "@/hooks/useSpeechReader";
 
 export default function LoginPage() {
   const router = useRouter()
@@ -16,7 +17,8 @@ const [a11yAnnounce, setA11yAnnounce] = useState('')
   const announceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // dark mode vem das preferências de acessibilidade
-  const dark = prefs.darkMode;
+  const dark = prefs.darkMode
+  useSpeechReader(prefs.speechMode)
 
   function togglePref(key: Parameters<typeof toggle>[0], label: string) {
     toggle(key);
