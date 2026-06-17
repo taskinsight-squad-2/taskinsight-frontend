@@ -58,7 +58,7 @@ export interface BacklogResponse {
 export interface ResponseTimeItem {
   date: string;
   slaPercentage: number;
-  target: number;
+  target: 90;
 }
 
 export interface ResponseTimeResponse {
