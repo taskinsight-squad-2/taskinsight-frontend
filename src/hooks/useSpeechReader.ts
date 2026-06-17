@@ -176,6 +176,7 @@ export function useSpeechReader(enabled: boolean) {
     return () => {
       stopChartWatcher()
       if (hoverDebounce) clearTimeout(hoverDebounce)
+      window.speechSynthesis?.cancel()
       document.removeEventListener('mouseover', onMouseOver)
       document.removeEventListener('focus', onFocus, true)
       document.removeEventListener('mouseleave', onMouseLeave)
