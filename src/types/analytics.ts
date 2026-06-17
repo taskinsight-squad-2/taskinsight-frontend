@@ -66,17 +66,6 @@ export interface ResponseTimeResponse {
   data: ResponseTimeItem[];
 }
 
-export interface ResponseTimeMesItem {
-  month: string;
-  slaPercentage: number;
-  target: number;
-}
-
-export interface ResponseTimeMesResponse {
-  success: boolean;
-  data: ResponseTimeMesItem[];
-}
-
 export interface ResolutionTimeItem {
   date: string;
   slaPercentage: number;
