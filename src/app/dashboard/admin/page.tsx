@@ -919,7 +919,7 @@ export default function AdminPage() {
                           <YAxis domain={[0, 100]} unit="%" tick={{ fill: dark ? '#ffffff40' : '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false}/>
                           <Tooltip content={<ChartTooltip dark={dark}/>}/>
                           <ReferenceLine y={90} stroke="#ef4444" strokeDasharray="5 3" label={{ value: t.slaResolutionMonthlyTarget, fill: '#ef4444', fontSize: 10, position: 'insideTopRight' }}/>
-                          <Line type="monotone" dataKey="slaPercentage" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', r: 3 }} name={t.slaResolutionMonthlyLineName}/>
+                          <Line type="monotone" dataKey="onTimeSolution" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', r: 3 }} name={t.slaResolutionMonthlyLineName}/>
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
